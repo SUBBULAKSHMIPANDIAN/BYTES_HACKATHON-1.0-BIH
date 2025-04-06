@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Study Buddy</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.2.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+    <h1>AI Study Buddy</h1>
+    <div id="chat-container"></div>
+    <div class="input-area">
+        <input type="text" id="user-input" placeholder="Type your message..." onkeypress="handleKeyPress(event)">
+        
+        <!-- Add these two buttons before the send button -->
+        <button id="attachment-btn" class="icon-btn" onclick="triggerFileInput()" title="Attach file">
+            <i class="fas fa-paperclip"></i>
+        </button>
+        <button id="audio-btn" class="icon-btn" onclick="toggleAudioRecording()" title="Voice message">
+            <i class="fas fa-microphone"></i>
+        </button>
+        
+        <button id="send-btn" onclick="sendMessage()">Send</button>
+        
+        <!-- Hidden file input -->
+        <input type="file" id="file-input" style="display: none;" onchange="handleFileSelection(this)">
+    </div>
+    <div id="timer-controls">
+    <div id="timer">⏳ Timer: Not Set</div>
+    <div class="timer-buttons">
+        <button onclick="cancelTimer()">Cancel</button>
+        <button onclick="addTime(60)">+1 min</button>
+        <button onclick="addTime(300)">+5 min</button>
+    </div>
+</div>
+    
+    <!-- Alert Popup -->
+    <div id="alert-overlay" class="alert-overlay">
+        <div class="alert-popup">
+            <h2 class="alert-title">Time's Up!</h2>
+            <p class="alert-message">Your study session has ended. Take a break or start a new session.</p>
+            <button class="alert-btn" onclick="dismissAlert()">Dismiss</button>
+        </div>
+    </div>
+    
+    <!-- Audio element for alarm -->
+    <audio id="alarm-sound" loop>
+        <source src="{{ url_for('static', filename='alarm-301729.mp3') }}" type="audio/mpeg">
+        Your browser does not support the audio element.
+    </audio>
+
+    <script>
+        const socket = io.connect("http://localhost:5000");
+        let timerInterval = null;
+        let timeLeft = 0;
+        let timerActive = false;
+        const timerDisplay = document.getElementById("timer");
+        const alarmSound = document.getElementById("alarm-sound");
+        const alertOverlay = document.getElementById("alert-overlay");
+
+        function handleKeyPress(event) {
+            if (event.key === "Enter") sendMessage();
+        }
+
+        function sendMessage() {
+            const userInput = document.getElementById("user-input").value;
+            if (!userInput) return;
+
+            appendMessage(userInput, "user");
+            document.getElementById("user-input").value = "";
+
+            fetch("/chat", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ query: userInput })
+            })
+            .then(response => response.json())
+            .then(data => appendMessage(data.response, "bot"));
+        }
+
+        function appendMessage(text, sender) {
+            const chatContainer = document.getElementById("chat-container");
+            const messageDiv = document.createElement("div");
+            messageDiv.className = `message ${sender}`;
+            messageDiv.innerText = text;
+            chatContainer.appendChild(messageDiv);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        socket.on("start_timer", function(data) {
+    timeLeft = data.seconds;
+    if (!timerActive) {
+        startTimer();
+    }
+});
+
+function startTimer() {
+    clearInterval(timerInterval);
+    timerActive = true;
+    updateTimerDisplay(timeLeft);
+    timerDisplay.classList.add("active");
+
+    timerInterval = setInterval(() => {
+        timeLeft--;
+        updateTimerDisplay(timeLeft);
+
+        if (timeLeft <= 0) {
+            clearInterval(timerInterval);
+            timerActive = false;
+            timeLeft = 0;
+            updateTimerDisplay(0);
+            showAlert();
+        }
+    }, 1000);
+}
+
+function cancelTimer() {
+    clearInterval(timerInterval);
+    timerActive = false;
+    timeLeft = 0;
+    updateTimerDisplay(0);
+    timerDisplay.classList.remove("active");
+    appendMessage("⏹️ Timer cancelled.", "bot");
+    dismissAlert();
+}
+
+function addTime(secondsToAdd) {
+    if (!timerActive || timeLeft <= 0) return;
+    timeLeft += secondsToAdd;
+    appendMessage(`⏱️ Added ${secondsToAdd / 60} min to the timer.`, "bot");
+    updateTimerDisplay(timeLeft);
+}
+
+function updateTimerDisplay(seconds) {
+    timerDisplay.innerText = `⏳ Timer: ${seconds > 0 ? seconds + "s remaining" : "Finished!"}`;
+}
+
+function showAlert() {
+    alertOverlay.classList.add("active");
+    try {
+        alarmSound.play().catch(error => {
+            document.addEventListener('click', function enableAudio() {
+                alarmSound.play().catch(e => console.log("Still cannot play audio:", e));
+                document.removeEventListener('click', enableAudio);
+            }, { once: true });
+        });
+    } catch (error) {
+        console.log("Audio playback error:", error);
+    }
+}
+
+function dismissAlert() {
+    alertOverlay.classList.remove("active");
+    alarmSound.pause();
+    alarmSound.currentTime = 0;
+}
+        
+
+        
+        // Add these functions to your existing JavaScript
+
+// File attachment functionality
+function triggerFileInput() {
+    document.getElementById('file-input').click();
+}
+
+function handleFileSelection(input) {
+    if (input.files && input.files[0]) {
+        let fileName = input.files[0].name;
+        appendMessage(`File attached: ${fileName}`, "user");
+        
+        // Here you would normally upload the file to your server
+        // For now we'll just simulate a response
+        setTimeout(() => {
+            appendMessage("I've received your file. What would you like to do with it?", "bot");
+        }, 1000);
+        
+        // Reset the file input
+        input.value = '';
+    }
+}
+
+// Audio recording functionality
+let isRecording = false;
+let mediaRecorder;
+let audioChunks = [];
+
+function toggleAudioRecording() {
+    const audioBtn = document.getElementById('audio-btn');
+    
+    if (!isRecording) {
+        // Start recording
+        navigator.mediaDevices.getUserMedia({ audio: true })
+            .then(stream => {
+                isRecording = true;
+                audioBtn.classList.add('recording');
+                audioBtn.innerHTML = '<i class="fas fa-stop"></i>';
+                
+                mediaRecorder = new MediaRecorder(stream);
+                audioChunks = [];
+                
+                mediaRecorder.ondataavailable = (event) => {
+                    audioChunks.push(event.data);
+                };
+                
+                mediaRecorder.onstop = () => {
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/mp3' });
+                    appendMessage("🎤 Voice message sent", "user");
+                    
+                    // Here you would normally send the audio to your server
+                    // For now we'll just simulate a response
+                    setTimeout(() => {
+                        appendMessage("I've received your voice message and processed it.", "bot");
+                    }, 1000);
+                };
+                
+                mediaRecorder.start();
+            })
+            .catch(error => {
+                console.error("Error accessing microphone:", error);
+                appendMessage("Could not access microphone. Please check permissions.", "bot");
+            });
+    } else {
+        // Stop recording
+        isRecording = false;
+        audioBtn.classList.remove('recording');
+        audioBtn.innerHTML = '<i class="fas fa-microphone"></i>';
+        
+        if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+            mediaRecorder.stop();
+            mediaRecorder.stream.getTracks().forEach(track => track.stop());
+        }
+    }
+}
+
+        function updateTimerDisplay(seconds) {
+            const timerDisplay = document.getElementById("timer");
+            timerDisplay.innerText = `⏳ Timer: ${seconds > 0 ? seconds + "s remaining" : "Finished!"}`;
+        }
+        
+        function showAlert() {
+            alertOverlay.classList.add("active");
+            // Play alarm sound
+            try {
+                alarmSound.play().catch(error => {
+                    console.log("Audio playback failed:", error);
+                    // Add event listener for user interaction to enable audio on mobile
+                    document.addEventListener('click', function enableAudio() {
+                        alarmSound.play().catch(e => console.log("Still cannot play audio:", e));
+                        document.removeEventListener('click', enableAudio);
+                    }, { once: true });
+                });
+            } catch (error) {
+                console.log("Audio playback error:", error);
+            }
+        }
+        
+        function dismissAlert() {
+            alertOverlay.classList.remove("active");
+            // Stop alarm sound
+            alarmSound.pause();
+            alarmSound.currentTime = 0;
+        }
+        
+        // Enable audio for iOS devices (requires user interaction)
+        document.addEventListener('touchstart', function() {
+            const silentAudio = document.createElement('audio');
+            silentAudio.setAttribute('src', 'data:audio/mp3;base64,//MkxAAHiAICWABElBeKPL/RANb2w+yiT1g/gTok//lP/W/l3h8QO/OCdCqCW2Cw//MkxAQHkAIWUAhEmAQXWUOFW2dxPu//9mr60ElY5sseQ+xxesmHKtZr7bsqqX2L//MkxAgFwAYiQAhEAC2hq22d3///9FTV6tA36JdgBJoOGgc+7qvqej5Zu7/7uI9l//MkxBQHAAYi8AhEAO193vt9KGOq+6qcT7hhfN5FTInmwk8RkqKImTM55pRQHQSq//MkxBsGkgoIAABHhTACIJLf99nVI///yuW1uBqWfEu7CgNPWGpUadBmZ////4sL//MkxCMHMAH9iABEmAsKioqKigsLCwtVTEFNRTMuOTkuNVVVVVVVVVVVVVVVVVVV//MkxCkECAUYCAAAAFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV');
+            silentAudio.volume = 0;
+            document.body.appendChild(silentAudio);
+            silentAudio.play().then(() => {
+                silentAudio.remove();
+            }).catch(e => {
+                console.log("iOS audio initialization failed:", e);
+            });
+        }, { once: true });
+        
+        // Handle page visibility changes
+        document.addEventListener("visibilitychange", function() {
+            if (document.hidden && alarmSound.played) {
+                alarmSound.pause();
+            } else if (!document.hidden && alertOverlay.classList.contains("active")) {
+                alarmSound.play().catch(e => console.log("Cannot resume audio:", e));
+            }
+        });
+    </script>
+
+</body>
+</html>
