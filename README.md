@@ -12,3 +12,12 @@ for chatbot
     cd chatbot
     pip install -r requirements.txt
     python main.py
+
+
+
+required environment variables
+GROQ_API_KEY
+TWILIO_SID
+TWILIO_TOKEN
+TWILIO_NUMBER
+MONGO_URI
