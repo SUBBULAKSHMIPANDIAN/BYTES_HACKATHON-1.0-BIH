@@ -5,3 +5,8 @@ groq
 python-dotenv
 twilio
 eventlet
+PyPDF2==3.0.1
+python-docx==1.1.0
+faiss-cpu==1.7.4  # or faiss-gpu if you're using GPU acceleration
+numpy==1.26.4
+sentence-transformers==2.6.1

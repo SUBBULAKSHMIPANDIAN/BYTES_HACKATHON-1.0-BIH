@@ -2,6 +2,7 @@ const socket = io.connect("http://localhost:5000");
 let timerInterval = null;
 let timeLeft = 0;
 let timerActive = false;
+
 const timerDisplay = document.getElementById("timer");
 const alarmSound = document.getElementById("alarm-sound");
 const alertOverlay = document.getElementById("alert-overlay");
@@ -11,19 +12,62 @@ function handleKeyPress(event) {
 }
 
 function sendMessage() {
-            const userInput = document.getElementById("user-input").value;
-            if (!userInput) return;
+    const userInputElem = document.getElementById("user-input");
+    const userInput = userInputElem.value;
+    const trimmedInput = userInput.trim();
 
-            appendMessage(userInput, "user");
-            document.getElementById("user-input").value = "";
+    // 🟡 Maintain your existing logic for plain text input
+    if (!trimmedInput && !selectedFile) return;
 
-            fetch("/chat", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ query: userInput })
-            })
-            .then(response => response.json())
-            .then(data => appendMessage(data.response, "bot"));
+    if (trimmedInput) {
+        appendMessage(trimmedInput, "user");
+        userInputElem.value = "";
+    }
+
+    // 🔁 If there's a file selected, send as FormData
+    if (selectedFile) {
+        const formData = new FormData();
+        formData.append("file", selectedFile);
+        if (trimmedInput) formData.append("query", trimmedInput);
+
+        const isImage = selectedFile.type.startsWith("image/");
+        appendMessage(isImage ? "🧠 Processing your image..." : "🧠 Processing your file...", "bot");
+
+        fetch("/chat", {
+            method: "POST",
+            body: formData
+        })
+        .then(res => res.json())
+        .then(data => {
+            const messages = document.querySelectorAll(".message.bot");
+            const lastBotMessage = messages[messages.length - 1];
+            if (lastBotMessage && lastBotMessage.innerText.includes("Processing")) {
+                lastBotMessage.remove();
+            }
+
+            if (data.transcribed) appendMessage(data.transcribed, "user");
+            appendMessage(data.response || "🤖 No response.", "bot");
+        })
+        .catch(err => {
+            console.error("File upload error:", err);
+            appendMessage("❌ Error processing your file.", "bot");
+        });
+
+        selectedFile = null; // Reset after sending
+    } else {
+        // 🔁 If only text, follow your original fetch
+        fetch("/chat", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ query: trimmedInput })
+        })
+        .then(response => response.json())
+        .then(data => appendMessage(data.response, "bot"))
+        .catch(err => {
+            console.error("Text send error:", err);
+            appendMessage("❌ Error processing your message.", "bot");
+        });
+    }
 }
 
 function appendMessage(text, sender) {
@@ -121,19 +165,58 @@ function triggerFileInput() {
     document.getElementById('file-input').click();
 }
 
+let selectedFile = null; // Global to store file
+
 function handleFileSelection(input) {
     if (input.files && input.files[0]) {
-        let fileName = input.files[0].name;
-        appendMessage(`File attached: ${fileName}`, "user");
-        
-        setTimeout(() => {
-            appendMessage("I've received your file. What would you like to do with it?", "bot");
-        }, 1000);
-        
-        // Reset the file input
-        input.value = '';
+        selectedFile = input.files[0];
+        const fileName = selectedFile.name;
+        const fileType = selectedFile.type;
+        const isImage = fileType.startsWith("image/");
+        const isDocument = fileType === "application/pdf" ||
+                           fileType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+                           fileType === "text/plain";
+
+        appendMessage(`📎 File attached: ${fileName}`, "user");
+
+        if (isImage) {
+            const reader = new FileReader();
+            reader.onload = function (e) {
+                const img = document.createElement("img");
+                img.src = e.target.result;
+                img.style.maxWidth = "200px";
+                img.style.borderRadius = "8px";
+                img.style.marginTop = "5px";
+                const chatContainer = document.getElementById("chat-container");
+                const wrapper = document.createElement("div");
+                wrapper.className = "message user";
+                wrapper.appendChild(img);
+                chatContainer.appendChild(wrapper);
+                chatContainer.scrollTop = chatContainer.scrollHeight;
+            };
+            reader.readAsDataURL(selectedFile);
+        } else if (isDocument) {
+            const icon = document.createElement("div");
+            icon.innerHTML = `📄 <strong>${fileName}</strong>`;
+            icon.style.marginTop = "5px";
+            icon.style.padding = "10px";
+            icon.style.border = "1px solid #ccc";
+            icon.style.borderRadius = "6px";
+            icon.style.backgroundColor = "#f9f9f9";
+            icon.style.display = "inline-block";
+
+            const chatContainer = document.getElementById("chat-container");
+            const wrapper = document.createElement("div");
+            wrapper.className = "message user";
+            wrapper.appendChild(icon);
+            chatContainer.appendChild(wrapper);
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+        }
+
+        input.value = "";
     }
 }
+
 
 
 

@@ -1,5 +1,5 @@
 import json
-from flask import Flask, request, jsonify, render_template
+from flask import Flask, request, jsonify, render_template, session
 from flask_cors import CORS
 from flask_socketio import SocketIO
 import groq
@@ -9,7 +9,13 @@ from datetime import datetime, timedelta
 import os
 from twilio.rest import Client as TwilioClient
 from dotenv import load_dotenv
-
+import base64
+from PyPDF2 import PdfReader
+import docx
+from werkzeug.utils import secure_filename
+import faiss
+import numpy as np
+from sentence_transformers import SentenceTransformer
 
 load_dotenv()
 # Initialize Flask app with SocketIO
@@ -36,6 +42,14 @@ client = groq.Client(api_key=groq_api_key)
     # Ensure a valid intent is returned
     valid_intents = ["greeting", "study_schedule", "set_reminder", "motivation", "general_query"]
     return intent if intent in valid_intents else "general_query" """
+
+
+embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
+
+# Global index and mapping
+index = faiss.IndexFlatL2(384)  # For all-MiniLM-L6-v2
+id_to_text = {}
+next_id = 0 
 
 def detect_intent_llm(text):
     prompt = [
@@ -165,16 +179,137 @@ def transcribe_audio_to_text(audio_path):
             file=(audio_path, file.read()),
             model="whisper-large-v3-turbo",
             response_format="verbose_json",
+            language="en"
         )
 
     return transcription.text
 
 
+def handle_image_query(image_file, query=None):
+    image_bytes = image_file.read()
+    mime_type = image_file.mimetype  # usually "image/jpeg" or "image/png"
+
+    # Encode image to base64
+    base64_image = base64.b64encode(image_bytes).decode("utf-8")
+
+    # Create image payload
+    image_payload = {
+        "type": "image_url",
+        "image_url": {
+            "url": f"data:{mime_type};base64,{base64_image}"
+        }
+    }
+
+    # Default to describing image
+    chat_prompt = query if query else "Describe this image in a very few lines.Dont provide extra context strictly follow this."
+
+    # Send to llama-3.2-11b-vision-preview via Groq client
+    response = client.chat.completions.create(
+        model="llama-3.2-11b-vision-preview",
+        messages=[
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": chat_prompt},
+                    image_payload
+                ]
+            }
+        ]
+    )
+
+    return response.choices[0].message.content
+
+def is_image(file):
+    return file.mimetype.startswith('image/')
+
+
+def extract_text(file):
+    ext = file.filename.lower()
+    if ext.endswith(".pdf"):
+        reader = PdfReader(file)
+        return "\n".join(page.extract_text() for page in reader.pages if page.extract_text())
+    elif ext.endswith(".docx"):
+        doc = docx.Document(file)
+        return "\n".join([para.text for para in doc.paragraphs])
+    elif ext.endswith(".txt"):
+        return file.read().decode("utf-8")
+    else:
+        raise ValueError("Unsupported file type")
+    
+def store_file_and_index(file):
+    global next_id
+
+    text = extract_text(file)
+    chunks = [text[i:i+500] for i in range(0, len(text), 500)]
+
+    for chunk in chunks:
+        embedding = embedding_model.encode(chunk, normalize_embeddings=True).astype("float32")
+        index.add(np.array([embedding]))
+        id_to_text[next_id] = chunk
+        next_id += 1
+
+def generate_llama_response_with_context(query, context):
+    final_prompt = f"""You are a AI Study Buddy assistant. Use the following context to answer the question.
+
+Context:
+{context}
+
+Question:
+{query}
+"""
+    chat_completion = client.chat.completions.create(
+        model="llama-3.3-70b-versatile",  # Or llama-3.3-70b-versatile
+        messages=[
+            {"role": "system", "content": "You are a knowledgeable assistant. Your job is to provide clear and accurate responses based strictly on the provided context.Dont provide information any other than the context strictly follow this rule "},
+            {"role": "user", "content": final_prompt}
+        ]
+    )
+    return chat_completion.choices[0].message.content.strip()
+
+
+def retrieve_relevant_text(query, top_k=5):
+    query_embedding = embedding_model.encode(query, normalize_embeddings=True).reshape(1, -1).astype("float32")
+    distances, indices = index.search(query_embedding, top_k)
+
+    retrieved = [id_to_text.get(i, "") for i in indices[0] if i >= 0]
+    return "\n".join(retrieved) if retrieved else "No relevant context found."
+
+
 @app.route("/chat", methods=["POST"])
 def chat():
+    global uploaded_doc_content
     transcribed = None
 
-    # Handle audio or text input
+    file = request.files.get("file")
+    query = request.form.get("query", "").strip() if request.form else None
+
+    # 🟡 Handle file uploads first (image or document)
+    if file:
+        if file.mimetype.startswith("image/"):
+            try:
+                response_text = handle_image_query(file, query)
+                return jsonify({"response": response_text})
+            except Exception as e:
+                print("Image handling error:", e)
+                return jsonify({"response": "❌ Failed to process the image."}), 500
+
+        elif any(file.filename.lower().endswith(ext) for ext in [".txt", ".pdf", ".docx"]):
+            try:
+                store_file_and_index(file)
+                if query:
+                    context = retrieve_relevant_text(query)
+                    response_text = generate_llama_response_with_context(query, context)
+                    return jsonify({"response": response_text})
+                else:
+                    return jsonify({"response": "📁 File processed. Ask your question related to the content."})
+            except Exception as e:
+                print("Document handling error:", e)
+                return jsonify({"response": "❌ Failed to process the document."}), 500
+
+        else:
+            return jsonify({"response": "❌ Unsupported file type."}), 415
+
+    # 🎤 Handle audio files
     if 'audio' in request.files:
         audio_file = request.files['audio']
         temp_path = "temp_audio.m4a"
@@ -182,8 +317,11 @@ def chat():
         user_input = transcribe_audio_to_text(temp_path)
         transcribed = user_input
         os.remove(temp_path)
+
     else:
-        user_input = request.json.get("query", "").strip()
+        # 💬 Handle regular text input
+        data = request.get_json()
+        user_input = data.get("query", "").strip() if data else ""
         transcribed = user_input
 
     if not user_input:
@@ -192,7 +330,7 @@ def chat():
             "transcribed": transcribed
         })
 
-    # Detect multiple sub-queries and intents
+    # 🤖 Intent Detection and Execution
     sub_queries = detect_intent_llm(user_input)
     print("Detected sub-queries:", sub_queries)
 
@@ -246,6 +384,8 @@ def chat():
         "response": "\n\n".join(responses),
         "transcribed": transcribed
     })
+
+
 
     
 @app.route("/")
