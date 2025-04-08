@@ -1,0 +1,8 @@
+Flask
+flask-cors
+flask-socketio
+groq
+python-dotenv
+twilio
+eventlet
+python-telegram-bot==20.7
