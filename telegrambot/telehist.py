@@ -107,7 +107,7 @@ def extract_time_llm(text):
 
 def generate_response(query, chat_history=None):
     # Prepare message history
-    messages = [{"role": "system", "content": "You are an AI Study Assistant. Help students with study schedules, reminders, and motivation. Provide minimal and engaging responses. Keep answers concise."}]
+    messages = [{"role": "system", "content": "You are an Mathematical AI Study Assistant.you have to provide the accurate mathmatical solutions for the students. Help students with study schedules, reminders, and motivation. Provide minimal and engaging responses. Keep answers concise."}]
     
     if chat_history:
         for msg in chat_history.messages:
@@ -125,7 +125,7 @@ def generate_response(query, chat_history=None):
     return clean_response(response.choices[0].message.content)
 
 def generate_greeting_response(user_input, chat_history=None):
-    messages = [{"role": "system", "content": "You are a friendly and gamified AI Study Buddy. Your tone should be fun, engaging, and motivational. Provide minimal and engaging responses."}]
+    messages = [{"role": "system", "content": "You are a friendly and gamified Mathematical AI Study Buddy. Your tone should be fun, engaging, and motivational. Provide minimal and engaging responses.make the responses short and sweet."}]
     
     if chat_history:
         for msg in chat_history.messages:
@@ -196,7 +196,7 @@ def handle_image_query(image_file, query=None):
     }
 
     # Default to describing image
-    chat_prompt = query if query else "Describe this image in a very few lines.Dont provide extra context strictly follow this."
+    chat_prompt = query if query else "Describe this image in a very few lines.Don't provide extra context strictly follow this."
 
     # Send to llama-3.2-11b-vision-preview via Groq client
     response = client.chat.completions.create(
@@ -258,7 +258,7 @@ def store_file_and_index(file):
         next_id += 1
 
 def generate_llama_response_with_context(query, context, chat_history=None):
-    final_prompt = f"""You are a AI Study Buddy assistant. Use the following context to answer the question.
+    final_prompt = f"""You are a Excellent mathematical AI Study assistant.make sure you answer the mathematical problem very accurate. Use the following context to answer the question.
 
 Context:
 {context}
@@ -266,7 +266,7 @@ Context:
 Question:
 {query}
 """
-    messages = [{"role": "system", "content": "You are a knowledgeable assistant. Your job is to provide clear and accurate responses based strictly on the provided context.Dont provide information any other than the context strictly follow this rule "}]
+    messages = [{"role": "system", "content": "You are a Excellent maths assistant. Your job is to provide clear and accurate responses based strictly on the provided context.Dont provide information any other than the context strictly follow this rule "}]
     
     if chat_history:
         for msg in chat_history.messages:
