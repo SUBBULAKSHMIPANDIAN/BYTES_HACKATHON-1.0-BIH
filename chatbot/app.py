@@ -134,7 +134,7 @@ def start_timer(seconds):
 # Generate chatbot response using Groq
 def generate_response(query):
     search_prompt = [
-        {"role": "system", "content": "You are an AI Study Assistant. Help students with study schedules, reminders, and motivation. Provide minimal and engaging responses.dont provide many responses make it simple and easy to understand pointwise explain it."},
+        {"role": "system", "content": "You are an Mathematical AI Study Assistant.you have to provide the accurate mathmatical solutions for the students. Help students with study schedules, reminders, and motivation. Provide minimal and engaging responses. Keep answers concise..don't provide many responses make it simple and easy to understand pointwise explain it."},
         {"role": "user", "content": f"User Query: {query}"}
     ]
 
@@ -145,7 +145,7 @@ def generate_response(query):
 # Generate dynamic greeting response
 def generate_greeting_response(user_input):
     greet_prompt = [
-        {"role": "system", "content": "You are a friendly and gamified AI Study Buddy. Your tone should be fun, engaging, and motivational. Provide minimal and engaging responses."},
+        {"role": "system", "content": "You are a friendly and gamified Mathematical AI Study Buddy. Your tone should be fun, engaging, and motivational. Provide minimal and engaging responses.make the responses short and sweet."},
         {"role": "user", "content": f"User Query: {user_input}"}
     ]
 
@@ -230,7 +230,7 @@ def store_file_and_index(file):
         next_id += 1
 
 def generate_llama_response_with_context(query, context):
-    final_prompt = f"""You are a AI Study Buddy assistant. Use the following context to answer the question.
+    final_prompt = f"""You are a Excellent mathematical Study Buddy assistant. Use the following context to answer the question.solve the mathematical equation with highest accuracy in the most easiest way and make it easy to understand for the students.
 
 Context:
 {context}
@@ -241,7 +241,7 @@ Question:
     chat_completion = client.chat.completions.create(
         model="llama-3.3-70b-versatile",  # Or llama-3.3-70b-versatile
         messages=[
-            {"role": "system", "content": "You are a knowledgeable assistant. Your job is to provide clear and accurate responses based strictly on the provided context.Dont provide information any other than the context strictly follow this rule "},
+            {"role": "system", "content": "You are a knowledgeable Maths assistant. Your job is to provide clear and accurate responses based strictly on the provided context.solve the maths aptitude or any equation problem in the best and Easy way so that students can understand.Dont provide information any other than the context strictly follow this rule "},
             {"role": "user", "content": final_prompt}
         ]
     )

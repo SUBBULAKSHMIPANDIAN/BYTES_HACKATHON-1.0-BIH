@@ -61,7 +61,7 @@ def get_user_memory(username):
         # Initialize LangChain memory
         llm = ChatGroq(temperature=0, model_name="llama3-70b-8192", groq_api_key=groq_api_key)
         prompt = ChatPromptTemplate.from_messages([
-            ("system", "You are an AI Study Assistant. Help students with study schedules, reminders, and motivation. Keep responses concise and engaging."),
+            ("system", "You are an Mathematical AI Study Assistant.you have to provide the accurate mathmatical solutions for the students. Help students with study schedules, reminders, and motivation. Provide minimal and engaging responses. Keep answers concise..don't provide many responses make it simple and easy to understand pointwise explain it."),
             MessagesPlaceholder(variable_name="history"),
             ("human", "{input}")
         ])
@@ -271,7 +271,7 @@ def get_user_chats(username):
     
     # If no chats exist, create a welcome conversation
     if not chats:
-        welcome_msg = "Welcome to Study Buddy! How can I help you today?"
+        welcome_msg = "Welcome to Math Buddy! How can I help you today?"
         save_chat_to_db(username, "New user started", welcome_msg)
         chats = list(chats_collection.find({"username": username}).sort("created_at", 1))
     
@@ -279,14 +279,14 @@ def get_user_chats(username):
 
 def generate_greeting_response(user_input):
     greet_prompt = [
-        {"role": "system", "content": "You are a friendly and gamified AI Study Buddy. Your tone should be fun, engaging, and motivational. Provide minimal and engaging responses."},
+        {"role": "system", "content": "You are a friendly and gamified Mathematical AI Study Buddy. Your tone should be fun, engaging, and motivational. Provide minimal and engaging responses.make the responses short and sweet."},
         {"role": "user", "content": f"User Query: {user_input}"}
     ]
     response = client.chat.completions.create(model="llama3-70b-8192", messages=greet_prompt)
     return clean_response(response.choices[0].message.content)
 
 def generate_llama_response_with_context(query, context):
-    final_prompt = f"""You are a AI Study Buddy assistant. Use the following context to answer the question.
+    final_prompt = f"""You are a Excellent mathematical Study Buddy assistant. Use the following context to answer the question.solve the mathematical equation with highest accuracy in the most easiest way and make it easy to understand for the students.
 
 Context:
 {context}
@@ -297,7 +297,7 @@ Question:
     chat_completion = client.chat.completions.create(
         model="llama-3.3-70b-versatile",  # Or llama-3.3-70b-versatile
         messages=[
-            {"role": "system", "content": "You are a knowledgeable assistant. Your job is to provide clear and accurate responses based strictly on the provided context.Dont provide information any other than the context strictly follow this rule "},
+            {"role": "system", "content": "You are a knowledgeable Maths assistant. Your job is to provide clear and accurate responses based strictly on the provided context.solve the maths aptitude or any equation problem in the best and Easy way so that students can understand.Dont provide information any other than the context strictly follow this rule"},
             {"role": "user", "content": final_prompt}
         ]
     )
