@@ -4,8 +4,9 @@ import Calculator from './Calculator';
 import Notes from './Notes';
 import Reminders from './Remainders';
 import Timer from './Timer';
-import { FaComments } from 'react-icons/fa';
 import '../../styles/dashboard.css';
+import GraphPlotter from './GraphPlotter';
+
 const Dashboard = () => {
   const navigate = useNavigate();
 
@@ -15,30 +16,40 @@ const Dashboard = () => {
 
   return (
     <div className="dashboard-container">
-      
       <div className="dashboard-panels">
+
+        {/* Left Panel */}
         <div className="panel left-panel">
           <Calculator />
           <Notes />
         </div>
-        
+
+        {/* Middle Panel */}
         <div className="panel middle-panel">
           <h2>Your Study Dashboard</h2>
           <p>
             Use this space to stay organized: Add notes, calculate, set reminders, and use timers to stay focused.
           </p>
-          <button 
-            className="chatbot-button"
-            onClick={openChatbot}
-          >
-            <FaComments /> Open Study Buddy Chatbot
-          </button>
+
+          {/* ✅ Chatbot button with spacing */}
+          <div className="chatbot-button-wrapper">
+            <button className="chatbot-button" onClick={openChatbot}>
+              🗨️ Open Study Buddy Chatbot
+            </button>
+          </div>
+
+          {/* ✅ GraphPlotter section */}
+          <div className="graph-container">
+            <GraphPlotter />
+          </div>
         </div>
-        
+
+        {/* Right Panel */}
         <div className="panel right-panel">
           <Reminders />
           <Timer />
         </div>
+
       </div>
     </div>
   );

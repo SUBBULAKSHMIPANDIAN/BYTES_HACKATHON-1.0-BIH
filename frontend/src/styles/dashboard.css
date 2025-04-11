@@ -295,6 +295,28 @@
   text-align: center;
   padding: 20px;
 }
+.chatbot-button-wrapper {
+  margin-bottom: 30px; /* Adjust spacing as needed */
+}
+
+
+/*.graph-section {
+  margin-top: 20px;
+  padding: 1rem;
+  background-color: #f4f6fa;
+  border-radius: 10px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+.graph-container {
+  margin: 20px auto;
+  width: 90%;
+  max-width: 500px;
+  background: #f8f9fa;
+  padding: 20px;
+  border-radius: 12px;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+}*/
+
 
 /* 📱 Mobile Responsive Enhancements */
 @media (max-width: 480px) {
