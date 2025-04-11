@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import api from '../../api';
 import '../../styles/dashboard.css';
-import { FaTrash, FaTimes, FaSave } from 'react-icons/fa';
+import { FaTimes, FaSave ,FaTrash} from 'react-icons/fa';
 
 const Notes = () => {
   const [notes, setNotes] = useState([]);

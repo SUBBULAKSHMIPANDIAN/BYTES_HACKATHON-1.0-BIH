@@ -5,6 +5,7 @@ import DashboardPage from './pages/Dashboardpage';
 import AuthPage from './pages/AuthPage';
 import Education from './components/Onboarding/Education';
 import Survey from './components/Onboarding/Survey';
+import Chatbot from './components/Dashboard/chatbot';
 import api from './api';
 import '../src/styles/main.css';
 
@@ -55,6 +56,12 @@ function App() {
             <Survey />
           </ProtectedRoute>
         } />
+        <Route path="/chatbot" element={
+          <ProtectedRoute isAuthenticated={isAuthenticated}>
+            <Chatbot />
+          </ProtectedRoute>
+        } />
+        
       </Routes>
     </Router>
   );
