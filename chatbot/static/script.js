@@ -15,8 +15,8 @@ function sendMessage() {
     const userInputElem = document.getElementById("user-input");
     const userInput = userInputElem.value;
     const trimmedInput = userInput.trim();
-
-    // 🟡 Maintain your existing logic for plain text input
+    const username = localStorage.getItem('username') || 'default';
+    console.log('Sending username:', username);
     if (!trimmedInput && !selectedFile) return;
 
     if (trimmedInput) {
@@ -24,11 +24,12 @@ function sendMessage() {
         userInputElem.value = "";
     }
 
-    // 🔁 If there's a file selected, send as FormData
+    // File upload case
     if (selectedFile) {
         const formData = new FormData();
         formData.append("file", selectedFile);
         if (trimmedInput) formData.append("query", trimmedInput);
+        formData.append("username", username);  // Add username to FormData
 
         const isImage = selectedFile.type.startsWith("image/");
         appendMessage(isImage ? "🧠 Processing your image..." : "🧠 Processing your file...", "bot");
@@ -53,13 +54,16 @@ function sendMessage() {
             appendMessage("❌ Error processing your file.", "bot");
         });
 
-        selectedFile = null; // Reset after sending
+        selectedFile = null;
     } else {
-        // 🔁 If only text, follow your original fetch
+        // Text-only case
         fetch("/chat", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ query: trimmedInput })
+            body: JSON.stringify({ 
+                query: trimmedInput,
+                username: username  // Include username in JSON body
+            })
         })
         .then(response => response.json())
         .then(data => appendMessage(data.response, "bot"))
@@ -248,12 +252,13 @@ function toggleAudioRecording() {
                 mediaRecorder.onstop = () => {
                     const mimeType = mediaRecorder.mimeType || 'audio/webm';
                     const audioBlob = new Blob(audioChunks, { type: mimeType });
+                    const username = localStorage.getItem('username') || 'default';
                 
-                    
                     appendMessage("🧠 Processing your voice message...", "bot");
                 
                     const formData = new FormData();
                     formData.append("audio", audioBlob, "voice-input.m4a");
+                    formData.append("username", username);  // Add username to audio FormData
                 
                     fetch("/chat", {
                         method: "POST",
@@ -261,20 +266,15 @@ function toggleAudioRecording() {
                     })
                     .then(res => res.json())
                     .then(data => {
-                        // Remove "processing..." message
                         const messages = document.querySelectorAll(".message.bot");
                         const lastBotMessage = messages[messages.length - 1];
                         if (lastBotMessage && lastBotMessage.innerText === "🧠 Processing your voice message...") {
                             lastBotMessage.remove();
                         }
                     
-                        // 🗣️ Show what user said (transcribed)
                         appendMessage(data.transcribed || "🎤 (Could not understand audio)", "user");
-                    
-                        // 🤖 Show bot response
                         appendMessage(data.response, "bot");
                     })
-                    
                     .catch(err => {
                         console.error("Error processing voice message:", err);
                         appendMessage("❌ Error processing your voice message. Try again.", "bot");

@@ -1,13 +1,11 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import axios from 'axios';
 import { FaMicrophone, FaPaperclip, FaPaperPlane, FaTrash, FaRegCopy } from 'react-icons/fa';
 import { BsStopFill } from 'react-icons/bs';
 import { IoMdRefresh } from 'react-icons/io';
-import { useNavigate } from 'react-router-dom';
 import '../../styles/Chatbot.css';
 
 const Chatbot = () => {
-  // State declarations (keep your existing state)
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState([]);
   const [isRecording, setIsRecording] = useState(false);
@@ -24,9 +22,8 @@ const Chatbot = () => {
   const fileInputRef = useRef(null);
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
-  const navigate = useNavigate();
   
-  // Get user info
+  // Get user info from localStorage
   const token = localStorage.getItem('token');
   const user = localStorage.getItem('username');
 
@@ -34,120 +31,125 @@ const Chatbot = () => {
   const API_BASE_URL = 'http://localhost:5000';
   const FLASK_BASE_URL = 'http://localhost:8000';
 
-  // Token verification
-  const verifyToken = async () => {
+  // Load a specific chat session
+  const loadChatSession = useCallback(async (sessionId) => {
     try {
-      await axios.get(`${API_BASE_URL}/api/auth/verify`, {
+      const { data } = await axios.get(`${API_BASE_URL}/api/chats/${sessionId}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      return true;
+      
+      setCurrentSession(data);
+      setMessages(data.messages);
+      setIsNewChat(false);
+      setError(null);
     } catch (err) {
-      return false;
+      console.error('Failed to load chat session:', err);
+      setError('Failed to load chat session');
     }
-  };
+  }, [token]);
 
-  // Scroll to bottom helper
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
-
-  // Initialize chat on mount
-  useEffect(() => {
-    const initializeChat = async () => {
-      try {
-        const isTokenValid = await verifyToken();
-        if (!isTokenValid) throw new Error('Invalid or expired token');
-        await fetchChatSessions();
-        setError(null);
-      } catch (err) {
-        console.error('Initialization error:', err);
-        setError(err.message || 'Failed to initialize chat');
-        if (err.response?.status === 401 || err.message === 'Invalid or expired token') {
-          localStorage.removeItem('token');
-          localStorage.removeItem('username');
-          navigate('/login');
-        }
-      } finally {
-        setIsInitializing(false);
-      }
-    };
-    initializeChat();
-  }, []);
-
-  // Scroll when messages change
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
-
-  // Fetch chat sessions
-  const fetchChatSessions = async () => {
-    try {
-      const response = await axios.get(`${API_BASE_URL}/api/chats`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      setChatSessions(response.data);
-      if (response.data.length > 0) {
-        await loadChatSession(response.data[0].sessionId);
-      } else {
-        await createNewSession();
-      }
-    } catch (err) {
-      console.error('Failed to fetch chat sessions:', err);
-      throw err;
-    }
-  };
-
-  // Create new session
-  const createNewSession = async () => {
+  // Create a new chat session
+  const createNewSession = useCallback(async () => {
     try {
       setIsLoading(true);
-      const response = await axios.post(`${API_BASE_URL}/api/chats`, {}, {
+      const { data } = await axios.post(`${API_BASE_URL}/api/chats`, {}, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      setCurrentSession(response.data);
+      
+      setCurrentSession(data);
       setMessages([]);
       setIsNewChat(true);
-      setChatSessions(prev => [response.data, ...prev]);
-      return response.data;
+      setChatSessions(prev => [data, ...prev]);
+      setError(null);
+      return data;
     } catch (err) {
       console.error('Failed to create new chat session:', err);
+      setError('Failed to create new chat');
       throw err;
     } finally {
       setIsLoading(false);
     }
-  };
-
-  // Load specific session
-  const loadChatSession = async (sessionId) => {
+  }, [token]);
+  const fetchChatSessions = useCallback(async () => {
     try {
-      const response = await axios.get(`${API_BASE_URL}/api/chats/${sessionId}`, {
-        headers: { Authorization: `Bearer ${token}` }
+      console.log('Attempting to fetch chats with token:', token); // Debug
+      
+      const { data } = await axios.get(`${API_BASE_URL}/api/chats`, {
+        headers: { 
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        timeout: 5000 // Add timeout
       });
-      setCurrentSession(response.data);
-      setMessages(response.data.messages);
-      setIsNewChat(false);
+      
+      return data;
     } catch (err) {
-      console.error('Failed to load chat session:', err);
-      throw err;
+      console.error('API Error Details:', {
+        status: err.response?.status,
+        data: err.response?.data,
+        config: err.config
+      });
+      
+      if (err.response?.status === 403) {
+        // Clear invalid token immediately
+        localStorage.removeItem('token');
+        localStorage.removeItem('username');
+        
+        // Show user-friendly message
+        setError('Session expired. Redirecting to login...');
+        
+        // Redirect after delay
+        /* setTimeout(() => window.location.href = '/login', 1000); */
+      }
+      
+      return []; // Return empty array to prevent crashes
     }
-  };
+  }, [token, API_BASE_URL]);
 
-  // Delete a session
+  useEffect(() => {
+    const initializeChat = async () => {
+      try {
+        await fetchChatSessions();
+      } catch (err) {
+        console.error('Initialization error:', err);
+        // Error is already handled in fetchChatSessions
+      } finally {
+        setIsInitializing(false);
+      }
+    };
+    
+    // Check if token exists before trying to initialize
+    if (token) {
+      initializeChat();
+    } else {
+      window.location.href = '/login';
+    }
+  }, [fetchChatSessions, token]);
+
+  // Scroll to bottom when messages change
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  // Delete a chat session
   const deleteChatSession = async (sessionId) => {
     try {
       await axios.delete(`${API_BASE_URL}/api/chats/${sessionId}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
+      
       if (currentSession?.sessionId === sessionId) {
         await createNewSession();
       }
+      
       fetchChatSessions();
     } catch (err) {
       console.error('Failed to delete chat session:', err);
+      setError('Failed to delete chat session');
     }
   };
 
-  // Send message to chatbot
+  // Send a message to the chatbot
   const sendMessage = async () => {
     if ((!input.trim() && !selectedFile) || !currentSession) return;
     
@@ -161,43 +163,68 @@ const Chatbot = () => {
       } : null
     };
     
+    // Optimistically update UI
     setMessages(prev => [...prev, userMessage]);
     setInput('');
     setSelectedFile(null);
     setIsLoading(true);
     
     try {
+      // Save user message to backend
       await axios.post(
         `${API_BASE_URL}/api/chats/${currentSession.sessionId}/messages`,
         userMessage,
-        { headers: { Authorization: `Bearer ${token}` } }
+        {
+          headers: { 
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        }
       );
 
-      const flaskResponse = await axios.post(
+      // Get response from Flask
+      const { data } = await axios.post(
         `${FLASK_BASE_URL}/api/chat`,
         { query: userMessage.content },
-        { headers: { Authorization: `Bearer ${token}` } }
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          }
+        }
       );
 
       const botMessage = {
-        content: flaskResponse.data?.response || "I didn't understand that.",
+        content: data?.response || "I didn't understand that.",
         sender: 'bot',
         timestamp: new Date()
       };
       
+      // Update UI with bot response
       setMessages(prev => [...prev, botMessage]);
+      
+      // Save bot response to backend
       await axios.post(
         `${API_BASE_URL}/api/chats/${currentSession.sessionId}/messages`,
         botMessage,
-        { headers: { Authorization: `Bearer ${token}` } }
+        {
+          headers: { 
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        }
       );
     } catch (err) {
       console.error('Failed to send message:', err);
-      setMessages(prev => [...prev, {
-        content: "Sorry, I'm having trouble responding.",
+      setError('Failed to send message');
+      
+      const errorMessage = {
+        content: "Sorry, I'm having trouble responding. Please try again.",
         sender: 'bot',
         timestamp: new Date()
-      }]);
+      };
+      
+      setMessages(prev => [...prev, errorMessage]);
     } finally {
       setIsLoading(false);
     }
@@ -209,7 +236,7 @@ const Chatbot = () => {
     if (!file) return;
     
     if (file.size > 10 * 1024 * 1024) {
-      alert('File size exceeds 10MB limit');
+      setError('File size exceeds 10MB limit');
       return;
     }
     
@@ -218,19 +245,23 @@ const Chatbot = () => {
       const formData = new FormData();
       formData.append('file', file);
       
-      const response = await axios.post(`${API_BASE_URL}/api/upload`, formData, {
-        headers: { Authorization: `Bearer ${token}` }
+      const { data } = await axios.post(`${API_BASE_URL}/api/upload`, formData, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'multipart/form-data'
+        }
       });
       
       setSelectedFile({
         name: file.name,
         type: file.type,
-        url: response.data.fileUrl,
+        url: data.fileUrl,
         originalFile: file
       });
+      setError(null);
     } catch (err) {
       console.error('File upload failed:', err);
-      alert('Failed to upload file');
+      setError('Failed to upload file. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -257,7 +288,7 @@ const Chatbot = () => {
       })
       .catch(err => {
         console.error('Error accessing microphone:', err);
-        alert('Microphone access denied');
+        setError('Microphone access denied. Please allow microphone access.');
       });
   };
 
@@ -275,35 +306,43 @@ const Chatbot = () => {
       const formData = new FormData();
       formData.append('audio', audioBlob, 'recording.webm');
       
-      const response = await axios.post(`${API_BASE_URL}/api/chat/transcribe`, formData, {
-        headers: { Authorization: `Bearer ${token}` }
+      const { data } = await axios.post(`${API_BASE_URL}/api/chat/transcribe`, formData, {
+        headers: { 
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'multipart/form-data'
+        }
       });
       
-      setInput(response.data.transcribed || '');
+      setInput(data.transcribed || '');
+      setError(null);
     } catch (err) {
       console.error('Failed to process audio:', err);
-      alert('Failed to process audio');
+      setError('Failed to process audio recording.');
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Copy message to clipboard
+  // UI helper functions
   const copyToClipboard = (text) => {
     navigator.clipboard.writeText(text)
-      .catch(err => console.error('Failed to copy text:', err));
+      .catch(err => {
+        console.error('Failed to copy text:', err);
+        setError('Failed to copy text');
+      });
   };
 
-  // Regenerate last response
   const regenerateResponse = async () => {
     if (messages.length === 0 || messages[messages.length - 1].sender !== 'bot') return;
     
     setIsLoading(true);
+    
     try {
       const updatedMessages = messages.slice(0, -1);
       setMessages(updatedMessages);
       
       const lastUserMessage = updatedMessages.reverse().find(m => m.sender === 'user');
+      
       if (lastUserMessage) {
         setInput(lastUserMessage.content);
         if (lastUserMessage.metadata) {
@@ -313,16 +352,17 @@ const Chatbot = () => {
             url: lastUserMessage.metadata.fileUrl
           });
         }
+        
         setTimeout(sendMessage, 300);
       }
     } catch (err) {
       console.error('Failed to regenerate response:', err);
+      setError('Failed to regenerate response');
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Handle Enter key press
   const handleKeyPress = (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -330,19 +370,8 @@ const Chatbot = () => {
     }
   };
 
-  // Loading and error states
   if (isInitializing) {
-    return <div className="loading-screen">Loading...</div>;
-  }
-
-  if (error) {
-    return (
-      <div className="error-screen">
-        <p>{error}</p>
-        <button onClick={() => window.location.reload()}>Retry</button>
-        <button onClick={() => navigate('/login')}>Login</button>
-      </div>
-    );
+    return <div className="loading-screen">Loading your chats...</div>;
   }
 
   return (
@@ -412,6 +441,8 @@ const Chatbot = () => {
       
       {/* Main chat area */}
       <div className="chatbot-main">
+        {error && <div className="error-message">{error}</div>}
+        
         {isNewChat && messages.length === 0 ? (
           <div className="welcome-message">
             <h2>Welcome to Math Study Assistant</h2>

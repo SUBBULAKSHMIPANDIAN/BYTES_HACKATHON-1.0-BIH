@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../../api';
 import '../../styles/auth.css';
@@ -9,15 +9,7 @@ const Login = ({ setIsAuthenticated }) => {
   const [error, setError] = useState('');
   const navigate = useNavigate();
 
-  // Moved useEffect inside the component
-  useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (token) {
-      verifyToken();
-    }
-  }, []);
-
-  const verifyToken = async () => {
+  const verifyToken = useCallback(async () => {
     try {
       await api.get('/auth/verify');
       setIsAuthenticated(true);
@@ -26,7 +18,14 @@ const Login = ({ setIsAuthenticated }) => {
       localStorage.removeItem('token');
       setIsAuthenticated(false);
     }
-  };
+  }, [setIsAuthenticated, navigate]);
+
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (token) {
+      verifyToken();
+    }
+  }, [verifyToken]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
