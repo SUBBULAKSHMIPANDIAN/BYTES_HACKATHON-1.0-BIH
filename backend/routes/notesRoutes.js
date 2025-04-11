@@ -1,10 +1,10 @@
 const express = require('express');
 const router = express.Router();
-const notesController = require('../controllers/notesController');
-const authMiddleware = require('../middlewares/auth');
+const noteController = require('../controllers/notesController');
 
-// Protected routes
-router.post('/', authMiddleware, notesController.createNote);
-router.get('/:username', authMiddleware, notesController.getNotes);
+router.post('/', noteController.createNote);
+router.get('/:username', noteController.getNotes);
+router.put('/:id', noteController.updateNote);
+router.delete('/:id', noteController.deleteNote);
 
 module.exports = router;

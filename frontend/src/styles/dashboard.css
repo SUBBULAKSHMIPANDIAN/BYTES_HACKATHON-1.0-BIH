@@ -76,3 +76,183 @@
     background: rgba(231, 76, 60, 0.1);
     border-radius: 4px;
   }
+
+  /* Notes Section */
+.notes-section {
+  position: relative;
+}
+
+.note-card {
+  background: white;
+  border-radius: 8px;
+  padding: 15px;
+  margin-bottom: 15px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+
+.note-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+}
+
+.note-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.note-title {
+  margin: 0;
+  font-size: 1.1rem;
+  color: #333;
+}
+
+.note-preview {
+  margin: 0 0 10px 0;
+  color: #666;
+}
+
+.note-date {
+  font-size: 0.8rem;
+  color: #999;
+}
+
+.empty-notes {
+  text-align: center;
+  padding: 20px;
+}
+
+.add-note-button {
+  background: #4CAF50;
+  color: white;
+  border: none;
+  padding: 10px 15px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  margin-top: 10px;
+}
+
+.add-note-button:hover {
+  background: #45a049;
+}
+
+.floating-button {
+  position: absolute;
+  bottom: -50px;
+  right: 20px;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+}
+
+/* Note Modal */
+.note-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0,0,0,0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.note-modal {
+  background: white;
+  border-radius: 8px;
+  width: 90%;
+  max-width: 500px;
+  max-height: 80vh;
+  overflow-y: auto;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px;
+  border-bottom: 1px solid #eee;
+}
+
+.modal-body {
+  padding: 15px;
+}
+
+.modal-input {
+  width: 100%;
+  padding: 10px;
+  margin-bottom: 15px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 1rem;
+}
+
+.modal-textarea {
+  width: 100%;
+  min-height: 150px;
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 1rem;
+  resize: vertical;
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: space-between;
+  padding: 15px;
+  border-top: 1px solid #eee;
+}
+
+.save-button {
+  background: #4CAF50;
+  color: white;
+  border: none;
+  padding: 8px 15px;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.save-button:hover {
+  background: #45a049;
+}
+
+.delete-button {
+  background: #f44336;
+  color: white;
+  border: none;
+  padding: 8px 15px;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.delete-button:hover {
+  background: #d32f2f;
+}
+
+.icon-button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 5px;
+  color: #666;
+}
+
+.icon-button:hover {
+  color: #333;
+}
+
+.close-button {
+  font-size: 1.2rem;
+}

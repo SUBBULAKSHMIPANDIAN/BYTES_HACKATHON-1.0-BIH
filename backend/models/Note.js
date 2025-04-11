@@ -6,6 +6,11 @@ const noteSchema = new mongoose.Schema({
     required: true,
     ref: 'User'
   },
+  title: {
+    type: String,
+    required: true,
+    trim: true
+  },
   content: {
     type: String,
     required: true,
@@ -16,8 +21,5 @@ const noteSchema = new mongoose.Schema({
     default: Date.now
   }
 });
-
-// Index for faster queries by username
-noteSchema.index({ username: 1 });
 
 module.exports = mongoose.model('Note', noteSchema);

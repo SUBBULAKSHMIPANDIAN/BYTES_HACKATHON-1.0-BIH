@@ -2,7 +2,14 @@ const Note = require('../models/Note');
 
 exports.createNote = async (req, res) => {
   try {
-    const { username, content } = req.body;
+    const { username, title, content } = req.body;
+
+    if (!title || !title.trim()) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'Note title cannot be empty'
+      });
+    }
 
     if (!content || !content.trim()) {
       return res.status(400).json({ 
@@ -13,6 +20,7 @@ exports.createNote = async (req, res) => {
 
     const note = new Note({
       username,
+      title: title.trim(),
       content: content.trim()
     });
 
@@ -57,6 +65,73 @@ exports.getNotes = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Failed to fetch notes',
+      error: error.message
+    });
+  }
+};
+
+exports.updateNote = async (req, res) => {
+  try {
+    const { title, content } = req.body;
+    const { id } = req.params;
+
+    if (!title || !title.trim() || !content || !content.trim()) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'Title and content cannot be empty'
+      });
+    }
+
+    const note = await Note.findByIdAndUpdate(
+      id,
+      { title: title.trim(), content: content.trim() },
+      { new: true }
+    );
+
+    if (!note) {
+      return res.status(404).json({
+        success: false,
+        message: 'Note not found'
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Note updated successfully',
+      note
+    });
+  } catch (error) {
+    console.error('Error updating note:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to update note',
+      error: error.message
+    });
+  }
+};
+
+exports.deleteNote = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const note = await Note.findByIdAndDelete(id);
+
+    if (!note) {
+      return res.status(404).json({
+        success: false,
+        message: 'Note not found'
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Note deleted successfully'
+    });
+  } catch (error) {
+    console.error('Error deleting note:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to delete note',
       error: error.message
     });
   }
