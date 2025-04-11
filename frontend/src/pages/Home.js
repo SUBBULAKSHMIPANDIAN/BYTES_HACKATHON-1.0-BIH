@@ -3,7 +3,6 @@ import { Link } from 'react-router-dom';
 import Navbar from '../components/shared/Navbar';
 import '../styles/main.css';
 import DashboardPage from '../pages/Dashboardpage'
-
 const Home = ({ isAuthenticated }) => {
   return (
     <div className="app-container">

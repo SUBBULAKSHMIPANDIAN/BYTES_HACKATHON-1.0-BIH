@@ -17,6 +17,7 @@ connectDB();
 
 // Routes
 app.use('/api/auth', authRoutes);
+app.use('/api', authRoutes); 
 app.use('/api/education', educationRoutes);
 app.use('/api/notes', notesRoutes);
 app.use('/api/survey', surveyRoutes);

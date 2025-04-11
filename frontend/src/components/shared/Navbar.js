@@ -17,7 +17,7 @@ const Navbar = ({ isAuthenticated }) => {
       <div className="nav-links">
         {isAuthenticated ? (
           <>
-            <Link to="/dashboard">Dashboard</Link>
+            <Link to="/">Dashboard</Link>
             <span className="welcome-text">
               Welcome, {localStorage.getItem('username')}!
             </span>

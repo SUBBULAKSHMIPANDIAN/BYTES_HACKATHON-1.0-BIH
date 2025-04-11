@@ -45,23 +45,34 @@ exports.login = async (req, res) => {
     res.status(500).json({ message: 'Server error' });
   }
 };
-// In your backend auth controller
 exports.verifyToken = async (req, res) => {
   try {
-    const token = req.header('Authorization')?.replace('Bearer ', '');
+    const token = req.header('Authorization')?.replace('Bearer ', '') || 
+                 req.cookies?.token; // If using cookies
+    
     if (!token) {
       return res.status(401).json({ success: false, message: 'No token provided' });
     }
 
     const decoded = jwt.verify(token, JWT_SECRET);
-    const user = await User.findById(decoded.id);
+    const user = await User.findById(decoded.id).select('-password');
     
     if (!user) {
       return res.status(401).json({ success: false, message: 'User not found' });
     }
 
-    res.status(200).json({ success: true, user: { username: user.username } });
+    res.status(200).json({ 
+      success: true, 
+      user: { 
+        username: user.username,
+        email: user.email,
+        id: user._id
+      } 
+    });
   } catch (error) {
+    if (error.name === 'TokenExpiredError') {
+      return res.status(401).json({ success: false, message: 'Token expired' });
+    }
     res.status(401).json({ success: false, message: 'Invalid token' });
   }
 };
