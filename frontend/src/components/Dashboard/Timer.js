@@ -23,7 +23,7 @@ function Timer() {
       timer = setInterval(() => {
         setTimeLeft(prev => {
           const newTime = prev - 1;
-          setProgress((totalTime - newTime) / totalTime);
+          setProgress(1 - (newTime / totalTime)); // Inverted progress calculation
           if (newTime <= 0) {
             setIsRunning(false);
             alert('⏰ Time is up!');
@@ -72,10 +72,8 @@ function Timer() {
 
   const handleTouchEnd = (type) => (e) => {
     if (touchStartY - touchEndY > 15) {
-      // Swipe up - increase
       updateTime(type, 1);
     } else if (touchEndY - touchStartY > 15) {
-      // Swipe down - decrease
       updateTime(type, -1);
     }
     setTouchStartY(0);
@@ -163,7 +161,7 @@ function Timer() {
       alignItems: 'center',
       cursor: 'ns-resize',
       userSelect: 'none',
-      touchAction: 'none', // Important for touch events
+      touchAction: 'none',
     },
     controlButtons: {
       display: 'flex',
@@ -200,24 +198,8 @@ function Timer() {
       top: '-15px',
       transition: 'left 1s linear',
       fontSize: '30px',
+      transform: isRunning ? 'scaleX(-1)' : 'none',
     },
-    // Mobile-specific styles
-    '@media (max-width: 480px)': {
-      timerBox: {
-        width: '90vw',
-        padding: '30px 20px',
-        minHeight: 'auto',
-      },
-      timeUnit: {
-        fontSize: '32px',
-        width: '70px',
-        height: '70px',
-      },
-      button: {
-        padding: '10px 15px',
-        fontSize: '14px',
-      },
-    }
   };
 
   // Apply responsive styles

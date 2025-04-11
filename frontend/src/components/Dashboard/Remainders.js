@@ -40,7 +40,7 @@ const Reminders = () => {
       remindersRef.current.forEach((rem, index) => {
         if (rem.date === currentDate && rem.time === currentTime && !rem.notified) {
           toast.info(`🔔 Reminder: ${rem.note}`, {
-            position: "top-right",
+            position: window.innerWidth > 768 ? "top-right" : "top-center",
             autoClose: 5000,
             hideProgressBar: false,
             closeOnClick: true,
@@ -71,44 +71,114 @@ const Reminders = () => {
     setReminders(reminders.filter((_, index) => index !== indexToDelete));
   };
 
+  // Responsive styles
+  const isMobile = window.innerWidth <= 768;
+
+  const responsiveStyles = {
+    container: {
+      padding: isMobile ? '15px' : '20px',
+      fontFamily: 'Segoe UI, sans-serif',
+      backgroundColor: '#f0f4f8',
+      borderRadius: '12px',
+      maxWidth: isMobile ? '100%' : '600px',
+      margin: 'auto',
+      boxSizing: 'border-box',
+    },
+    heading: {
+      textAlign: 'center',
+      color: '#333',
+      fontSize: isMobile ? '1.5rem' : '2rem',
+    },
+    form: {
+      display: 'flex',
+      flexDirection: 'column',
+      gap: isMobile ? '8px' : '10px',
+      marginBottom: '20px',
+    },
+    input: {
+      padding: isMobile ? '8px' : '10px',
+      borderRadius: '8px',
+      border: '1px solid #ccc',
+      fontSize: isMobile ? '14px' : '16px',
+    },
+    button: {
+      padding: isMobile ? '8px' : '10px',
+      borderRadius: '8px',
+      border: 'none',
+      background: 'linear-gradient(to right, #43cea2, #185a9d)',
+      color: '#fff',
+      fontSize: isMobile ? '14px' : '16px',
+      cursor: 'pointer',
+    },
+    list: {
+      display: 'flex',
+      flexDirection: 'column',
+      gap: isMobile ? '8px' : '10px',
+    },
+    card: {
+      backgroundColor: '#fff',
+      padding: isMobile ? '10px' : '12px',
+      borderRadius: '8px',
+      boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+      position: 'relative',
+      fontSize: isMobile ? '14px' : '16px',
+    },
+    notified: {
+      marginTop: '8px',
+      color: 'green',
+      fontWeight: 'bold',
+      fontSize: isMobile ? '12px' : '14px',
+    },
+    deleteButton: {
+      marginTop: '8px',
+      padding: isMobile ? '5px 10px' : '6px 12px',
+      border: 'none',
+      backgroundColor: '#ff4d4f',
+      color: '#fff',
+      borderRadius: '6px',
+      cursor: 'pointer',
+      fontSize: isMobile ? '12px' : '14px',
+    },
+  };
+
   return (
-    <div style={styles.container}>
-      <h2 style={styles.heading}>📝 Set Your Reminders</h2>
-      <div style={styles.form}>
+    <div style={responsiveStyles.container}>
+      <h2 style={responsiveStyles.heading}>📝 Set Your Reminders</h2>
+      <div style={responsiveStyles.form}>
         <input
           type="date"
           value={reminder.date}
           onChange={(e) => setReminder({ ...reminder, date: e.target.value })}
-          style={styles.input}
+          style={responsiveStyles.input}
         />
         <input
           type="time"
           value={reminder.time}
           onChange={(e) => setReminder({ ...reminder, time: e.target.value })}
-          style={styles.input}
+          style={responsiveStyles.input}
         />
         <input
           type="text"
           placeholder="Reminder note"
           value={reminder.note}
           onChange={(e) => setReminder({ ...reminder, note: e.target.value })}
-          style={styles.input}
+          style={responsiveStyles.input}
         />
-        <button onClick={handleAddReminder} style={styles.button}>
+        <button onClick={handleAddReminder} style={responsiveStyles.button}>
           ➕ Add Reminder
         </button>
       </div>
 
-      <div style={styles.list}>
+      <div style={responsiveStyles.list}>
         {reminders.map((rem, idx) => (
-          <div key={idx} style={styles.card}>
+          <div key={idx} style={responsiveStyles.card}>
             <div>📅 {rem.date}</div>
             <div>⏰ {rem.time}</div>
             <div>📝 {rem.note}</div>
-            {rem.notified && <div style={styles.notified}>✅ Notified</div>}
+            {rem.notified && <div style={responsiveStyles.notified}>✅ Notified</div>}
             <button
               onClick={() => handleDeleteReminder(idx)}
-              style={styles.deleteButton}
+              style={responsiveStyles.deleteButton}
             >
               ❌ Delete
             </button>
@@ -119,69 +189,6 @@ const Reminders = () => {
       <ToastContainer />
     </div>
   );
-};
-
-const styles = {
-  container: {
-    padding: '20px',
-    fontFamily: 'Segoe UI, sans-serif',
-    backgroundColor: '#f0f4f8',
-    borderRadius: '12px',
-    maxWidth: '600px',
-    margin: 'auto',
-  },
-  heading: {
-    textAlign: 'center',
-    color: '#333',
-  },
-  form: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '10px',
-    marginBottom: '20px',
-  },
-  input: {
-    padding: '10px',
-    borderRadius: '8px',
-    border: '1px solid #ccc',
-    fontSize: '16px',
-  },
-  button: {
-    padding: '10px',
-    borderRadius: '8px',
-    border: 'none',
-    background: 'linear-gradient(to right, #43cea2, #185a9d)',
-    color: '#fff',
-    fontSize: '16px',
-    cursor: 'pointer',
-  },
-  list: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '10px',
-  },
-  card: {
-    backgroundColor: '#fff',
-    padding: '12px',
-    borderRadius: '8px',
-    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-    position: 'relative',
-  },
-  notified: {
-    marginTop: '8px',
-    color: 'green',
-    fontWeight: 'bold',
-  },
-  deleteButton: {
-    marginTop: '10px',
-    padding: '6px 12px',
-    border: 'none',
-    backgroundColor: '#ff4d4f',
-    color: '#fff',
-    borderRadius: '6px',
-    cursor: 'pointer',
-    fontSize: '14px',
-  },
 };
 
 export default Reminders;
