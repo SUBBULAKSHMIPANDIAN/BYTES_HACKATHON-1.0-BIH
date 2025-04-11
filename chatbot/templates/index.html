@@ -11,6 +11,8 @@
 <body>
 
     <h1>Maths AI</h1>
+    <p id="username-display" style="text-align: center; font-weight: bold; color: #444; margin-top: -10px;"></p>
+
     <div id="chat-container"></div>
     <div class="input-area">
         <input type="text" id="user-input" placeholder="Type your message..." onkeypress="handleKeyPress(event)">
@@ -52,6 +54,28 @@
         Your browser does not support the audio element.
     </audio>
 <script src="{{ url_for('static', filename='script.js') }}"></script>
+<script>
+    // Display username on page load
+document.addEventListener('DOMContentLoaded', function() {
+    const username = localStorage.getItem('username');
+    if (username) {
+        document.getElementById('username-display').textContent = `Welcome, ${username}!`;
+    }
+});
+    // Get the URL parameters
+const params = new URLSearchParams(window.location.search);
+
+// Extract the 'username' parameter
+const username = params.get('username');
+
+// Store it in localStorage
+if (username) {
+  localStorage.setItem('username', username);
+  console.log('Username stored:', username);
+}
+
+</script>
+
 <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
 </body>
 </html>

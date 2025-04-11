@@ -11,7 +11,12 @@ const Dashboard = () => {
   const navigate = useNavigate();
 
   const openChatbot = () => {
-    navigate('/chatbot');
+    /* navigate('/chatbot'); */
+    const username = localStorage.getItem('username') || 'Guest';
+const encodedUsername = encodeURIComponent(username);
+window.location.href = `http://127.0.0.1:8000?username=${encodedUsername}`;
+
+
   };
 
   return (

@@ -20,16 +20,6 @@ from langchain_core.messages import HumanMessage, AIMessage
 
 load_dotenv()
 
-from pymongo import MongoClient
-from bson.objectid import ObjectId
-
-# MongoDB Setup
-mongo_uri = os.getenv("MONGO_URI")
-mongo_client = MongoClient(mongo_uri)
-db = mongo_client["test"]
-
-users_collection = db["users"]
-education_collection = db["educations"]
 # Initialize Flask app with SocketIO
 app = Flask(__name__)
 app.secret_key = os.getenv("FLASK_SECRET_KEY", "default-secret-key")  # Required for session
@@ -77,45 +67,35 @@ def detect_intent_llm(text):
         {
             "role": "system",
             "content": (
-                "You are an Excellent AI that classifies user messages for a math study assistant.\n"
-                "Carefully determine the intent of the message from these categories:\n"
-                "\n1. greeting - Simple greetings like 'hello', 'hi'\n"
-                "2. study_schedule - Requests to set up study times ('study at 3pm', 'set timer for 30 mins')\n"
-                "3. set_reminder - Requests for future notifications ('remind me tomorrow', 'alert me in 1 hour')\n"
-                "4. motivation - Requests for encouragement or study motivation\n"
-                "5. general_query - All math-related questions and requests for concepts/explanations\n"
-                "\nSPECIAL RULES:\n"
-                "- Any request for math concepts, explanations, or problems should be 'general_query'\n"
-                "- Requests like 'easy concepts for my level' are ALWAYS 'general_query'\n"
-                "- Only classify as study_schedule if there's a clear time/duration mentioned\n"
-                "\nReturn JSON format: [{\"query\": \"message\", \"intent\": \"type\"}]\n"
-                "Example: [{\"query\": \"easy concepts for my level\", \"intent\": \"general_query\"}]"
+                "You are an Excellent AI that extracts and classifies multiple intents from a user message.\n"
+                "Your task is to identify the intent of each sub-query in the message.\n"
+                "Classify the intents into the following categories:\n"
+                "Supported intents: greeting, study_schedule, set_reminder, motivation, general_query.\n"
+                "If the input contains multiple tasks, split them and label each with its intent.\n"
+                "Reply in JSON format like:\n"
+                "[{\"query\": \"message one\", \"intent\": \"greeting\"}, {\"query\": \"message two\", \"intent\": \"set_reminder\"}]"
+                "you are an mathematical chatbot so if the query is about maths then classify it as general_query.\n"
+                "If no intent is found, return [{\"query\": \"message\", \"intent\": \"general_query\"}].\n\n"
             )
         },
         {
             "role": "user",
-            "content": f"Classify this message: {text}"
+            "content": f"User message: {text}"
         }
     ]
 
     response = client.chat.completions.create(
         model="llama3-70b-8192",
-        response_format={"type": "json_object"},
         messages=prompt
     )
 
     try:
         result = json.loads(response.choices[0].message.content)
-        # Handle both direct array response and object-with-array responses
-        if isinstance(result, dict) and "intents" in result:
-            items = result["intents"]
-        else:
-            items = result if isinstance(result, list) else [result]
-            
+        # Ensure proper formatting
         valid_intents = ["greeting", "study_schedule", "set_reminder", "motivation", "general_query"]
-        return [item for item in items if item.get("intent") in valid_intents]
+        return [item for item in result if item["intent"] in valid_intents]
     except Exception as e:
-        print(f"Intent parsing error for '{text}':", e)
+        print("Intent parsing error:", e)
         return [{"query": text, "intent": "general_query"}]
 
 def extract_time_llm(text):
@@ -181,52 +161,13 @@ def start_timer(seconds):
     socketio.emit("start_timer", {"seconds": seconds})  # Send initial time
     threading.Timer(seconds, lambda: socketio.emit("timer_finished", {"message": "✅ Timer finished! Take a short break! ☕"})).start()
 
-def generate_response_with_history(query, session_id, username):
+def generate_response_with_history(query, session_id):
     # Get the conversation history
     history = get_session_history(session_id)
     
-    
-    # Get user's education details using the passed username
-    # Update the education query to be case-insensitive
-    user_education = education_collection.find_one({
-        "username": {"$regex": f"^{username}$", "$options": "i"}})
-    
-    # Prepare education context for prompt
-    education_context = ""
-    if user_education:
-        education_context = f"""
-        User's Education Profile:
-        - Level: {user_education.get('educationLevel', 'Not specified')}
-        - Class/Year: {user_education.get('classOrYear', 'Not specified')}
-        - Institution: {user_education.get('institution', 'Not specified')}
-        - Course: {user_education.get('course', 'Not specified')}
-        - Semester: {user_education.get('semester', 'Not specified')}
-        """
-        print(f"Found education details: {education_context}")  # Debug print
-    else:
-        education_context = "User's education details are not available."
-        print(f"No education details found for username: {username}") 
-    # Prepare the messages for the LLM with education context
+    # Prepare the messages for the LLM
     messages = [
-        {
-            "role": "system", 
-            "content": f"""You are an Mathematical AI Study Assistant specialized in providing solutions tailored to the user's education level. 
-            {education_context}
-            
-            Guidelines:
-            1. For maths problems from education levels 1-5 (primary school), provide simple, step-by-step solutions with basic explanations.
-            2. For higher education (UG/PG), provide more detailed mathematical solutions with appropriate technical terms.
-            3. For vocational courses, focus on practical applications of mathematical concepts.
-            4. Always verify your calculations for absolute accuracy.
-            5. If the query isn't mathematical, politely guide them to mathematical topics or suggest consulting other resources.
-            6. For engineering students, emphasize problem-solving approaches and real-world applications.
-            
-            Current User Profile:
-            - Level: {user_education.get('educationLevel', 'Not specified') if user_education else 'Not specified'}
-            - Course: {user_education.get('course', 'Not specified') if user_education else 'Not specified'}
-            
-            Provide accurate mathematical solutions tailored to these specifications."""
-        }
+        {"role": "system", "content": "You are an Mathematical AI Study Assistant. Provide accurate mathematical solutions. Help with study schedules, reminders, and motivation. Keep responses concise and easy to understand."}
     ]
     
     # Add the last 5 messages from history (adjust as needed)
@@ -350,46 +291,16 @@ def store_file_and_index(file):
 def generate_llama_response_with_context(query, context, session_id):
     history = get_session_history(session_id)
     
-    # Get username from localStorage (passed via template)
-    username = request.args.get('username') or 'default'
-    
-    # Get user's education details from MongoDB
-    user_education = education_collection.find_one({"username": username})
-    
-    # Prepare education context for prompt
-    education_context = ""
-    if user_education:
-        education_context = f"""
-        User's Education Profile:
-        - Level: {user_education.get('educationLevel', 'Not specified')}
-        - Class/Year: {user_education.get('classOrYear', 'Not specified')}
-        - Course: {user_education.get('course', 'Not specified')}
-        """
-    
-    final_prompt = f"""You are an Excellent mathematical Study Buddy assistant. Use the following context to answer the question. 
-    {education_context}
-    
-    Solve the mathematical equation with highest accuracy in the most appropriate way for the user's education level.
-    Make it easy to understand for the student's level.
-    
-    Context:
-    {context}
+    final_prompt = f"""You are a Excellent mathematical Study Buddy assistant. Use the following context to answer the question.solve the mathematical equation with highest accuracy in the most easiest way and make it easy to understand for the students.
 
-    Question:
-    {query}
-    """
-    
+Context:
+{context}
+
+Question:
+{query}
+"""
     messages = [
-        {
-            "role": "system", 
-            "content": f"""You are a knowledgeable Maths assistant. Provide clear and accurate responses based strictly on the provided context.
-            {education_context}
-            
-            Tailor your response to:
-            - Education Level: {user_education.get('educationLevel', 'Not specified') if user_education else 'Not specified'}
-            - Course: {user_education.get('course', 'Not specified') if user_education else 'Not specified'}
-            """
-        }
+        {"role": "system", "content": "You are a knowledgeable Maths assistant. Provide clear and accurate responses based strictly on the provided context."}
     ]
     
     for msg in history.messages[-5:]:
@@ -423,25 +334,6 @@ def chat():
     if request.method == 'OPTIONS':
         # Preflight request
         return jsonify({'message': 'CORS preflight'}), 200
-    try:
-        # Get username from either JSON or form data
-        if request.content_type == 'application/json':
-            data = request.get_json()
-            
-            username = data.get('username', 'default').strip()
-        else:
-            username = request.form.get('username', 'default').strip()
-        
-        print(f"Received username: {username}")  # Debug print
-        
-        if not username or username == 'default':
-            return jsonify({"error": "Username is required"}), 400
-            
-        # Rest of your chat endpoint logic...
-        
-    except Exception as e:
-        print(f"Error in chat endpoint: {e}")
-        return jsonify({"error": "Internal server error"}), 500
     # Generate or retrieve session ID
     session_id = request.cookies.get('session_id') or str(hash(request.remote_addr))
     
@@ -539,10 +431,10 @@ def chat():
                 responses.append("⌛ I can set up your study session, but I need a valid time. When should we start? 🕒")
 
         elif intent == "motivation":
-            responses.append(generate_response_with_history(query, session_id,username))
+            responses.append(generate_response_with_history(query, session_id))
 
         else:  # general_query or fallback
-            responses.append(generate_response_with_history(query, session_id,username))
+            responses.append(generate_response_with_history(query, session_id))
 
     return jsonify({
         "response": "\n\n".join(responses),
