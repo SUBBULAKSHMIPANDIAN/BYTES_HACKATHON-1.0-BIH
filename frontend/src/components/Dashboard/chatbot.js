@@ -66,7 +66,7 @@ const Chatbot = () => {
         // Move fetchConversations definition here
         const fetchConversations = async () => {
           try {
-            const response = await fetch('/api/conversations', {
+            const response = await fetch('http://127.0.0.1:8000/api/conversations', {
               headers: {
                 'Authorization': `Bearer ${token}`
               }
@@ -128,7 +128,7 @@ const Chatbot = () => {
   // Fetch user conversations
   const fetchConversations = async () => {
     try {
-      const response = await fetch('/api/conversations', {
+      const response = await fetch('http://127.0.0.1:8000/api/conversations', {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('jwtToken')}`
         }
@@ -148,7 +148,7 @@ const Chatbot = () => {
   // Load a specific conversation
   const loadConversation = async (conversationId) => {
     try {
-      const response = await fetch(`/api/conversation/${conversationId}`, {
+      const response = await fetch(`http://127.0.0.1:8000/api/conversation/${conversationId}`, {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('jwtToken')}`
         }
@@ -164,7 +164,7 @@ const Chatbot = () => {
   // Delete a conversation
   const deleteConversation = async (conversationId) => {
     try {
-      await fetch(`/api/conversation/${conversationId}`, {
+      await fetch(`http://127.0.0.1:8000/api/conversation/${conversationId}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('jwtToken')}`
@@ -185,51 +185,49 @@ const Chatbot = () => {
   };
 
   // Send a message
-  const sendMessage = async () => {
-    const msg = message.trim();
-    if (!msg) return;
+  // Update your sendMessage function to use axios consistently
+const sendMessage = async () => {
+  const msg = message.trim();
+  if (!msg) return;
 
-    // Add user message to UI immediately
-    const userMessage = { query: msg, response: '', timestamp: new Date().toLocaleTimeString() };
-    setMessages(prev => [...prev, userMessage]);
-    setMessage('');
-
-    try {
-      const formData = new FormData();
-      formData.append('query', msg);
-      if (activeConversation) {
-        formData.append('conversation_id', activeConversation);
-      }
-
-      const response = await fetch('/api/chat', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('jwtToken')}`
-        },
-        body: formData
-      });
-
-      const data = await response.json();
-      
-      // Update with AI response
-      setMessages(prev => [...prev.slice(0, -1), {
-        ...userMessage,
-        response: data.response
-      }]);
-
-      // If this started a new conversation, refresh the list
-      if (data.conversation_id && !activeConversation) {
-        setActiveConversation(data.conversation_id);
-        await fetchConversations();
-      }
-    } catch (error) {
-      console.error('Error sending message:', error);
-      setMessages(prev => [...prev.slice(0, -1), {
-        ...userMessage,
-        response: "Sorry, I encountered an error. Please try again."
-      }]);
-    }
+  const userMessage = { 
+    query: msg, 
+    response: '', 
+    timestamp: new Date().toLocaleTimeString() 
   };
+  setMessages(prev => [...prev, userMessage]);
+  setMessage('');
+
+  try {
+    const formData = new FormData();
+    formData.append('query', msg);
+    if (activeConversation) {
+      formData.append('conversation_id', activeConversation);
+    }
+
+    const response = await api.post('http://127.0.0.1:8000/api/chat', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      } 
+    });
+
+    setMessages(prev => [...prev.slice(0, -1), {
+      ...userMessage,
+      response: response.data.response
+    }]);
+
+    if (response.data.conversation_id && !activeConversation) {
+      setActiveConversation(response.data.conversation_id);
+      await fetchConversations();
+    }
+  } catch (error) {
+    console.error('Error sending message:', error);
+    setMessages(prev => [...prev.slice(0, -1), {
+      ...userMessage,
+      response: error.response?.data?.message || "Sorry, I encountered an error. Please try again."
+    }]);
+  }
+};
 
   // Handle file upload
   const handleFileUpload = async (e) => {
@@ -242,7 +240,7 @@ const Chatbot = () => {
     if (activeConversation) formData.append('conversation_id', activeConversation);
 
     try {
-      const response = await fetch('/api/chat', {
+      const response = await fetch('http://127.0.0.1:8000/chat', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('jwtToken')}`
@@ -298,7 +296,7 @@ const Chatbot = () => {
           if (activeConversation) formData.append('conversation_id', activeConversation);
 
           try {
-            const response = await fetch('/api/chat', {
+            const response = await fetch('http://127.0.0.1:8000/api/chat', {
               method: 'POST',
               headers: {
                 'Authorization': `Bearer ${localStorage.getItem('jwtToken')}`

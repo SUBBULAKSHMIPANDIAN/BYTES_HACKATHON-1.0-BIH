@@ -20,10 +20,7 @@ from langchain.memory import ConversationBufferMemory
 from langchain.chains import ConversationChain
 from langchain_groq import ChatGroq
 from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
-import jwt
-from functools import wraps
-from bson import ObjectId
-
+from bson.objectid import ObjectId
 load_dotenv()
 
 # Initialize Flask app with SocketIO
@@ -37,10 +34,6 @@ mongo_uri = os.getenv("MONGO_URI")
 mongo_client = MongoClient(mongo_uri)
 db = mongo_client["test"]
 chats_collection = db["chats"]
-
-# JWT setup
-JWT_SECRET = os.getenv("JWT_SECRET")
-JWT_ALGORITHM = "HS256"
 
 # Groq setup
 groq_api_key = os.getenv("GROQ_API_KEY")
@@ -79,33 +72,6 @@ def get_user_memory(username):
             memory=memory
         )
     return user_memories[username]
-
-# JWT authentication decorator
-def token_required(f):
-    @wraps(f)
-    def decorated(*args, **kwargs):
-        token = None
-        
-        # Check for token in Authorization header
-        if 'Authorization' in request.headers:
-            token = request.headers['Authorization'].split(" ")[1]
-            
-        if not token:
-            return jsonify({'message': 'Token is missing!'}), 401
-        
-        try:
-            data = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
-            current_user = data['username']
-        except jwt.ExpiredSignatureError:
-            return jsonify({'message': 'Token has expired!'}), 401
-        except jwt.InvalidTokenError:
-            return jsonify({'message': 'Token is invalid!'}), 401
-        except Exception as e:
-            return jsonify({'message': str(e)}), 401
-        
-        return f(current_user, *args, **kwargs)
-    return decorated
-
 
 # Helper functions
 def clean_response(text):
@@ -349,9 +315,9 @@ def home():
     return render_template("i.html")
 
 @app.route("/api/chats", methods=["GET"])
-@token_required
-def get_chats(current_user):
-    chats = get_user_chats(current_user)
+def get_chats():
+    username = request.args.get("username")
+    chats = get_user_chats(username)
     return jsonify([{
         "query": chat["query"],
         "response": chat["response"],
@@ -360,20 +326,21 @@ def get_chats(current_user):
     } for chat in chats])
 
 @app.route("/api/chat", methods=["POST"])
-@token_required
-def chat(current_user):
+def chat():
     # Initialize variables
     transcribed = None
     file = request.files.get("file")
+    username = request.form.get("username")
     conversation_id = request.form.get("conversation_id") if request.form else None
     query = request.form.get("query", "").strip() if request.form else None
+    
     if not conversation_id:
         # Check if user has any existing conversations
-        existing_conv = chats_collection.find_one({"username": current_user})
+        existing_conv = chats_collection.find_one({"username": username})
         if not existing_conv:
             # Create welcome conversation
             welcome_response = "Welcome to Study Buddy! I'm here to help with your studies. What would you like to work on today?"
-            conversation_id = save_chat_to_db(current_user, "New session started", welcome_response)
+            conversation_id = save_chat_to_db(username, "New session started", welcome_response)
 
     # Handle file uploads (images/documents)
     if file:
@@ -381,7 +348,7 @@ def chat(current_user):
             try:
                 response_text = handle_image_query(file, query)
                 conversation_id = save_chat_to_db(
-                    current_user, 
+                    username, 
                     query or "Image uploaded", 
                     response_text, 
                     conversation_id
@@ -401,7 +368,7 @@ def chat(current_user):
                     context = retrieve_relevant_text(query)
                     response_text = generate_llama_response_with_context(query, context)
                     conversation_id = save_chat_to_db(
-                        current_user, 
+                        username, 
                         query, 
                         response_text, 
                         conversation_id
@@ -432,6 +399,7 @@ def chat(current_user):
         user_input = data.get("query", "").strip() if data else ""
         transcribed = user_input
         conversation_id = data.get("conversation_id") if data else None
+        username = data.get("username") if data else None
 
     if not user_input:
         return jsonify({
@@ -452,7 +420,7 @@ def chat(current_user):
             response = generate_greeting_response(query)
             responses.append(response)
             conversation_id = save_chat_to_db(
-                current_user, 
+                username, 
                 query, 
                 response, 
                 conversation_id
@@ -465,12 +433,12 @@ def chat(current_user):
                 if time_data["type"] == "relative":
                     threading.Thread(
                         target=start_timer, 
-                        args=(time_data["seconds"], current_user)
+                        args=(time_data["seconds"], username)
                     ).start()
                     response = f"✅ Timer started! Your study session is set for {time_data['seconds']} seconds. Time to focus! 📚"
                     responses.append(response)
                     conversation_id = save_chat_to_db(
-                        current_user, 
+                        username, 
                         query, 
                         response, 
                         conversation_id
@@ -490,7 +458,7 @@ def chat(current_user):
                     response = f"⏰ Alarm set for {time_data['time']}. I'll call and message you when it's time! 📞"
                     responses.append(response)
                     conversation_id = save_chat_to_db(
-                        current_user, 
+                        username, 
                         query, 
                         response, 
                         conversation_id
@@ -499,7 +467,7 @@ def chat(current_user):
                 response = "⌛ I can set up your study session, but I need a valid time. When should we start? 🕒"
                 responses.append(response)
                 conversation_id = save_chat_to_db(
-                    current_user, 
+                    username, 
                     query, 
                     response, 
                     conversation_id
@@ -507,12 +475,12 @@ def chat(current_user):
 
         else:
             # Use LangChain for general queries with memory
-            conversation = get_user_memory(current_user)
+            conversation = get_user_memory(username)
             response = conversation.predict(input=query)
             response = clean_response(response)
             responses.append(response)
             conversation_id = save_chat_to_db(
-                current_user, 
+                username, 
                 query, 
                 response, 
                 conversation_id
@@ -525,24 +493,24 @@ def chat(current_user):
     })
 
 @app.route("/api/conversations", methods=["GET"])
-@token_required
-def get_conversations(current_user):
+def get_conversations():
     """Get list of all conversations for the user, creates first if new"""
-    conversations = get_user_chats(current_user)
+    username = request.args.get("username")
+    conversations = get_user_chats(username)
     
     return jsonify([{
         "id": conv["conversation_id"],
         "title": conv["title"],
         "last_updated": conv["updated_at"].strftime("%Y-%m-%d %H:%M"),
         "message_count": conv["message_count"]
-    } for conv in conversations if "conversation_id" in conv])  # Ensure we only return proper conversations
+    } for conv in conversations if "conversation_id" in conv])
 
 @app.route("/api/conversation/<conversation_id>", methods=["GET"])
-@token_required
-def get_conversation(current_user, conversation_id):
+def get_conversation(conversation_id):
     """Get all messages in a specific conversation"""
+    username = request.args.get("username")
     conversation = chats_collection.find_one(
-        {"conversation_id": conversation_id, "username": current_user},
+        {"conversation_id": conversation_id, "username": username},
         {"_id": 0, "messages": 1}
     )
     
@@ -558,12 +526,12 @@ def get_conversation(current_user, conversation_id):
     })
 
 @app.route("/api/conversation/<conversation_id>", methods=["DELETE"])
-@token_required
-def delete_conversation(current_user, conversation_id):
+def delete_conversation(conversation_id):
     """Delete entire conversation"""
+    username = request.args.get("username")
     result = chats_collection.delete_one({
         "conversation_id": conversation_id,
-        "username": current_user
+        "username": username
     })
     
     if result.deleted_count == 1:
@@ -572,9 +540,9 @@ def delete_conversation(current_user, conversation_id):
         return jsonify({"error": "Conversation not found"}), 404
 
 @app.route("/api/message/<conversation_id>", methods=["DELETE"])
-@token_required
-def delete_message(current_user, conversation_id):
+def delete_message(conversation_id):
     """Delete specific message from conversation"""
+    username = request.args.get("username")
     timestamp = request.json.get("timestamp")  # Frontend sends the message timestamp
     
     if not timestamp:
@@ -586,7 +554,7 @@ def delete_message(current_user, conversation_id):
         return jsonify({"error": "Invalid timestamp format"}), 400
     
     result = chats_collection.update_one(
-        {"conversation_id": conversation_id, "username": current_user},
+        {"conversation_id": conversation_id, "username": username},
         {
             "$pull": {"messages": {"timestamp": target_time}},
             "$inc": {"message_count": -1},
@@ -600,9 +568,9 @@ def delete_message(current_user, conversation_id):
         return jsonify({"error": "Message not found"}), 404
 
 @app.route("/api/chat/<chat_id>", methods=["GET"])
-@token_required
-def get_single_chat(current_user, chat_id):
-    chat = chats_collection.find_one({"_id": chat_id, "username": current_user})
+def get_single_chat(chat_id):
+    username = request.args.get("username")
+    chat = chats_collection.find_one({"_id": chat_id, "username": username})
     if not chat:
         return jsonify({"error": "Chat not found"}), 404
     return jsonify({

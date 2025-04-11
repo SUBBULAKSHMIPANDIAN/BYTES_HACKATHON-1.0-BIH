@@ -56,62 +56,18 @@
     </audio>
     
     <script>
-        // Get JWT token from localStorage
-        const token = localStorage.getItem('jwtToken');
-        let currentUser = null;
+        // Socket.io connection
+        const socket = io();
+        let currentUser = "ww"; // Replace with your actual user management
         
-        // Decode JWT to get username
-        if (token) {
-            const payload = JSON.parse(atob(token.split('.')[1]));
-            currentUser = payload.username;
-            document.getElementById('username-display').textContent = `Welcome, ${currentUser}`;
-        } else {
-            // Handle case where no token exists (redirect to login or get token from your auth system)
-            console.error('No JWT token found');
-        }
-        
-        // Socket.io connection with auth
-        const socket = io({
-            extraHeaders: {
-                Authorization: `Bearer ${token}`
-            }
-        });
-        function verifyToken() {
-    const token = localStorage.getItem('jwtToken');
-    if (!token) {
-        console.log('No token found');
-        return;
-    }
-    
-    console.log('Token exists, payload:', JSON.parse(atob(token.split('.')[1])));
-    
-    // Send test request
-    fetch('/api/verify-token', {
-        headers: {
-            'Authorization': `Bearer ${token}`
-        }
-    })
-    .then(response => {
-        console.log('Token verification status:', response.status);
-        return response.json();
-    })
-    .then(data => console.log('Token verification response:', data))
-    .catch(error => console.error('Token verification error:', error));
-}
         // Load chat history when page loads
         window.onload = function() {
-            verifyToken(); // Verify token on load
-            if (currentUser) {
-                loadChatHistory();
-            }
+            document.getElementById('username-display').textContent = `Welcome, ${currentUser}`;
+            loadChatHistory();
         };
         
         function loadChatHistory() {
-            fetch('/api/chats', {
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                }
-            })
+            fetch(`/api/chats?username=${currentUser}`)
             .then(response => response.json())
             .then(chats => {
                 const chatList = document.getElementById('chat-list');
@@ -131,11 +87,7 @@
         }
         
         function loadChat(chatId) {
-            fetch(`/api/chat/${chatId}`, {
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                }
-            })
+            fetch(`/api/chat/${chatId}?username=${currentUser}`)
             .then(response => response.json())
             .then(chat => {
                 const chatContainer = document.getElementById('chat-container');
@@ -145,45 +97,38 @@
             });
         }
         
-        // Rest of your existing JavaScript functions with added auth headers...
         function sendMessage() {
-    const message = document.getElementById('user-input').value.trim();
-    if (!message) return;
+            const message = document.getElementById('user-input').value.trim();
+            if (!message) return;
 
-    displayMessage(message, 'user');
-    document.getElementById('user-input').value = '';
-    
-    fetch('/api/chat', {
-        method: 'POST',
-        headers: getAuthHeaders(),
-        body: JSON.stringify({ query: message })
-    })
-    .then(response => {
-        if (response.status === 401) {
-            throw new Error('Unauthorized');
+            displayMessage(message, 'user');
+            document.getElementById('user-input').value = '';
+            
+            fetch('/api/chat', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ 
+                    query: message
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                displayMessage(data.response, 'assistant');
+                loadChatHistory();
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                displayMessage("Sorry, I encountered an error. Please try again.", 'assistant');
+            });
         }
-        return response.json();
-    })
-    .then(data => {
-        displayMessage(data.response, 'assistant');
-        loadChatHistory();
-    })
-    .catch(error => {
-        console.error('Error:', error);
-        if (error.message === 'Unauthorized') {
-            alert('Your session has expired. Please login again.');
-            window.location.href = '/login';
-        } else {
-            displayMessage("Sorry, I encountered an error. Please try again.", 'assistant');
-        }
-    });
-}
         
-        // Handle file upload with JWT
         function handleFileSelection(input) {
             if (input.files && input.files[0]) {
                 const formData = new FormData();
                 formData.append('file', input.files[0]);
+                formData.append('username', currentUser);
                 
                 if (input.files[0].type.startsWith('image/')) {
                     const query = document.getElementById('user-input').value.trim();
@@ -192,22 +137,19 @@
                 
                 fetch('/api/chat', {
                     method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${token}`
-                    },
                     body: formData
                 })
                 .then(response => response.json())
                 .then(data => {
                     if (data.response) {
                         displayMessage(data.response, 'assistant');
-                        loadChatHistory(); // Refresh chat history
+                        loadChatHistory();
                     }
                 });
             }
         }
         
-        // Socket.io listeners with user check
+        // Socket.io listeners
         socket.on('start_timer', (data) => {
             if (data.username === currentUser) {
                 updateTimerDisplay(data.seconds);
@@ -221,7 +163,6 @@
             }
         });
         
-        // Rest of your existing timer and UI functions...
         function displayMessage(message, sender) {
             const messageDiv = document.createElement('div');
             messageDiv.className = `message ${sender}`;
@@ -237,12 +178,12 @@
         }
         
         function cancelTimer() {
-            socket.emit('cancel_timer');
+            socket.emit('cancel_timer', { username: currentUser });
             document.getElementById('timer').textContent = '⏳ Timer: Not Set';
         }
         
         function addTime(seconds) {
-            socket.emit('add_time', { seconds });
+            socket.emit('add_time', { seconds, username: currentUser });
         }
         
         function triggerFileInput() {
@@ -261,7 +202,7 @@
             document.getElementById('alarm-sound').currentTime = 0;
         }
         
-        // Audio recording functions (same as before)
+        // Audio recording functions
         let mediaRecorder;
         let audioChunks = [];
         
@@ -280,12 +221,10 @@
                         const audioBlob = new Blob(audioChunks, { type: 'audio/m4a' });
                         const formData = new FormData();
                         formData.append('audio', audioBlob, 'recording.m4a');
+                        formData.append('username', currentUser);
                         
                         fetch('/api/chat', {
                             method: 'POST',
-                            headers: {
-                                'Authorization': `Bearer ${token}`
-                            },
                             body: formData
                         })
                         .then(response => response.json())
@@ -296,7 +235,7 @@
                             if (data.response) {
                                 displayMessage(data.response, 'assistant');
                             }
-                            loadChatHistory(); // Refresh chat history
+                            loadChatHistory();
                         });
                     };
                     

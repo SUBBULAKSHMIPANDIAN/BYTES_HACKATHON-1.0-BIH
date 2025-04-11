@@ -126,13 +126,13 @@
 }
 
 .message.user {
-  background-color: #e3f2fd;
+  background-color: #0095ff;
   margin-left: auto;
   border-bottom-right-radius: 5px;
 }
 
 .message.assistant {
-  background-color: #f1f1f1;
+  background-color: #000000;
   margin-right: auto;
   border-bottom-left-radius: 5px;
 }
