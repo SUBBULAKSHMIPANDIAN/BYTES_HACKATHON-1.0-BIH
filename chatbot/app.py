@@ -243,7 +243,7 @@ Question:
 {query}
 """
     chat_completion = client.chat.completions.create(
-        model="llama-3.3-70b-versatile",  # Or llama-3.3-70b-versatile
+        model="meta-llama/llama-4-maverick-17b-128e-instruct",  # Or llama-3.3-70b-versatile
         messages=[
             {"role": "system", "content": "You are a knowledgeable Maths assistant. Your job is to provide clear and accurate responses based strictly on the provided context.solve the maths aptitude or any equation problem in the best and Easy way so that students can understand.Dont provide information any other than the context strictly follow this rule "},
             {"role": "user", "content": final_prompt}

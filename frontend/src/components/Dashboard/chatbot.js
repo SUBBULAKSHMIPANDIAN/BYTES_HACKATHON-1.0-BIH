@@ -1,478 +1,574 @@
 import React, { useState, useEffect, useRef } from 'react';
+import axios from 'axios';
+import { FaMicrophone, FaPaperclip, FaPaperPlane, FaTrash, FaRegCopy } from 'react-icons/fa';
+import { BsStopFill } from 'react-icons/bs';
+import { IoMdRefresh } from 'react-icons/io';
 import { useNavigate } from 'react-router-dom';
-import { FaPaperclip, FaMicrophone, FaStop, FaArrowLeft, FaTrash } from 'react-icons/fa';
-import io from 'socket.io-client';
-import api from '../../api'; // Make sure this import exists
 import '../../styles/Chatbot.css';
 
 const Chatbot = () => {
-  const navigate = useNavigate();
-  const [message, setMessage] = useState('');
+  // State declarations (keep your existing state)
+  const [input, setInput] = useState('');
   const [messages, setMessages] = useState([]);
-  const [currentUser, setCurrentUser] = useState(null);
-  const [conversations, setConversations] = useState([]);
-  const [activeConversation, setActiveConversation] = useState(null);
   const [isRecording, setIsRecording] = useState(false);
-  const [timer, setTimer] = useState('⏳ Timer: Not Set');
-  const socketRef = useRef(null);
-  const chatContainerRef = useRef(null);
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [currentSession, setCurrentSession] = useState(null);
+  const [chatSessions, setChatSessions] = useState([]);
+  const [isNewChat, setIsNewChat] = useState(true);
+  const [showSidebar, setShowSidebar] = useState(false);
+  const [isInitializing, setIsInitializing] = useState(true);
+  const [error, setError] = useState(null);
+  
+  const messagesEndRef = useRef(null);
+  const fileInputRef = useRef(null);
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
+  const navigate = useNavigate();
+  
+  // Get user info
+  const token = localStorage.getItem('token');
+  const user = localStorage.getItem('username');
+
+  // API configuration
+  const API_BASE_URL = 'http://localhost:5000';
+  const FLASK_BASE_URL = 'http://localhost:8000';
+
+  // Token verification
   const verifyToken = async () => {
     try {
-      await api.get('/auth/verify');
+      await axios.get(`${API_BASE_URL}/api/auth/verify`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
       return true;
     } catch (err) {
-      localStorage.removeItem('token');
-      localStorage.removeItem('jwtToken');
       return false;
     }
   };
-  // Initialize socket and user data
+
+  // Scroll to bottom helper
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  // Initialize chat on mount
   useEffect(() => {
     const initializeChat = async () => {
-      const token = localStorage.getItem('jwtToken') || localStorage.getItem('token');
-      
-      if (!token || !(await verifyToken())) {
-        navigate('/auth/login');
-        return;
-      }
-  
       try {
-        const payload = JSON.parse(atob(token.split('.')[1]));
-        setCurrentUser(payload.username);
-        
-        // Initialize Socket.IO connection
-        socketRef.current = io('http://127.0.0.1:8000', {
-          extraHeaders: {
-            Authorization: `Bearer ${token}`
-          }
-        });
-  
-        // Socket listeners
-        socketRef.current.on('start_timer', (data) => {
-          if (data.username === payload.username) {
-            updateTimerDisplay(data.seconds);
-          }
-        });
-  
-        socketRef.current.on('timer_finished', (data) => {
-          if (data.username === payload.username) {
-            setShowAlert(true);
-            playAlarmSound();
-          }
-        });
-  
-        // Move fetchConversations definition here
-        const fetchConversations = async () => {
-          try {
-            const response = await fetch('http://127.0.0.1:8000/api/conversations', {
-              headers: {
-                'Authorization': `Bearer ${token}`
-              }
-            });
-            const data = await response.json();
-            setConversations(data);
-            
-            if (data.length > 0 && !activeConversation) {
-              loadConversation(data[0].id);
-            }
-          } catch (error) {
-            console.error('Error fetching conversations:', error);
-          }
-        };
-  
-        // Call it
-        await fetchConversations();
-  
-      } catch (error) {
-        console.error('Error initializing chat:', error);
-        navigate('/auth/login');
+        const isTokenValid = await verifyToken();
+        if (!isTokenValid) throw new Error('Invalid or expired token');
+        await fetchChatSessions();
+        setError(null);
+      } catch (err) {
+        console.error('Initialization error:', err);
+        setError(err.message || 'Failed to initialize chat');
+        if (err.response?.status === 401 || err.message === 'Invalid or expired token') {
+          localStorage.removeItem('token');
+          localStorage.removeItem('username');
+          navigate('/login');
+        }
+      } finally {
+        setIsInitializing(false);
       }
     };
-  
     initializeChat();
-  
-    return () => {
-      if (socketRef.current) {
-        socketRef.current.disconnect();
-      }
-    };
-  }, [navigate]); // Now we don't need fetchConversations in dependencies
+  }, []);
 
-  // Scroll to bottom of chat
+  // Scroll when messages change
   useEffect(() => {
-    if (chatContainerRef.current) {
-      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
-    }
+    scrollToBottom();
   }, [messages]);
 
-  // Alert state
-  const [showAlert, setShowAlert] = useState(false);
-  const alarmSoundRef = useRef(null);
-
-  const playAlarmSound = () => {
-    if (alarmSoundRef.current) {
-      alarmSoundRef.current.play();
-    }
-  };
-
-  const dismissAlert = () => {
-    setShowAlert(false);
-    if (alarmSoundRef.current) {
-      alarmSoundRef.current.pause();
-      alarmSoundRef.current.currentTime = 0;
-    }
-  };
-
-  // Fetch user conversations
-  const fetchConversations = async () => {
+  // Fetch chat sessions
+  const fetchChatSessions = async () => {
     try {
-      const response = await fetch('http://127.0.0.1:8000/api/conversations', {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('jwtToken')}`
-        }
+      const response = await axios.get(`${API_BASE_URL}/api/chats`, {
+        headers: { Authorization: `Bearer ${token}` }
       });
-      const data = await response.json();
-      setConversations(data);
-      
-      // If there are conversations but none active, set the first one as active
-      if (data.length > 0 && !activeConversation) {
-        loadConversation(data[0].id);
+      setChatSessions(response.data);
+      if (response.data.length > 0) {
+        await loadChatSession(response.data[0].sessionId);
+      } else {
+        await createNewSession();
       }
-    } catch (error) {
-      console.error('Error fetching conversations:', error);
+    } catch (err) {
+      console.error('Failed to fetch chat sessions:', err);
+      throw err;
     }
   };
 
-  // Load a specific conversation
-  const loadConversation = async (conversationId) => {
+  // Create new session
+  const createNewSession = async () => {
     try {
-      const response = await fetch(`http://127.0.0.1:8000/api/conversation/${conversationId}`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('jwtToken')}`
-        }
+      setIsLoading(true);
+      const response = await axios.post(`${API_BASE_URL}/api/chats`, {}, {
+        headers: { Authorization: `Bearer ${token}` }
       });
-      const data = await response.json();
-      setMessages(data.messages);
-      setActiveConversation(conversationId);
-    } catch (error) {
-      console.error('Error loading conversation:', error);
+      setCurrentSession(response.data);
+      setMessages([]);
+      setIsNewChat(true);
+      setChatSessions(prev => [response.data, ...prev]);
+      return response.data;
+    } catch (err) {
+      console.error('Failed to create new chat session:', err);
+      throw err;
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  // Delete a conversation
-  const deleteConversation = async (conversationId) => {
+  // Load specific session
+  const loadChatSession = async (sessionId) => {
     try {
-      await fetch(`http://127.0.0.1:8000/api/conversation/${conversationId}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('jwtToken')}`
-        }
+      const response = await axios.get(`${API_BASE_URL}/api/chats/${sessionId}`, {
+        headers: { Authorization: `Bearer ${token}` }
       });
-      
-      // Refresh conversations
-      await fetchConversations();
-      
-      // If we deleted the active conversation, clear the messages
-      if (activeConversation === conversationId) {
-        setMessages([]);
-        setActiveConversation(null);
+      setCurrentSession(response.data);
+      setMessages(response.data.messages);
+      setIsNewChat(false);
+    } catch (err) {
+      console.error('Failed to load chat session:', err);
+      throw err;
+    }
+  };
+
+  // Delete a session
+  const deleteChatSession = async (sessionId) => {
+    try {
+      await axios.delete(`${API_BASE_URL}/api/chats/${sessionId}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (currentSession?.sessionId === sessionId) {
+        await createNewSession();
       }
-    } catch (error) {
-      console.error('Error deleting conversation:', error);
+      fetchChatSessions();
+    } catch (err) {
+      console.error('Failed to delete chat session:', err);
     }
   };
 
-  // Send a message
-  // Update your sendMessage function to use axios consistently
-const sendMessage = async () => {
-  const msg = message.trim();
-  if (!msg) return;
+  // Send message to chatbot
+  const sendMessage = async () => {
+    if ((!input.trim() && !selectedFile) || !currentSession) return;
+    
+    const userMessage = {
+      content: input,
+      sender: 'user',
+      timestamp: new Date(),
+      metadata: selectedFile ? {
+        fileType: selectedFile.type,
+        fileUrl: selectedFile.url
+      } : null
+    };
+    
+    setMessages(prev => [...prev, userMessage]);
+    setInput('');
+    setSelectedFile(null);
+    setIsLoading(true);
+    
+    try {
+      await axios.post(
+        `${API_BASE_URL}/api/chats/${currentSession.sessionId}/messages`,
+        userMessage,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
 
-  const userMessage = { 
-    query: msg, 
-    response: '', 
-    timestamp: new Date().toLocaleTimeString() 
+      const flaskResponse = await axios.post(
+        `${FLASK_BASE_URL}/api/chat`,
+        { query: userMessage.content },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      const botMessage = {
+        content: flaskResponse.data?.response || "I didn't understand that.",
+        sender: 'bot',
+        timestamp: new Date()
+      };
+      
+      setMessages(prev => [...prev, botMessage]);
+      await axios.post(
+        `${API_BASE_URL}/api/chats/${currentSession.sessionId}/messages`,
+        botMessage,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+    } catch (err) {
+      console.error('Failed to send message:', err);
+      setMessages(prev => [...prev, {
+        content: "Sorry, I'm having trouble responding.",
+        sender: 'bot',
+        timestamp: new Date()
+      }]);
+    } finally {
+      setIsLoading(false);
+    }
   };
-  setMessages(prev => [...prev, userMessage]);
-  setMessage('');
 
-  try {
-    const formData = new FormData();
-    formData.append('query', msg);
-    if (activeConversation) {
-      formData.append('conversation_id', activeConversation);
-    }
-
-    const response = await api.post('http://127.0.0.1:8000/api/chat', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data'
-      } 
-    });
-
-    setMessages(prev => [...prev.slice(0, -1), {
-      ...userMessage,
-      response: response.data.response
-    }]);
-
-    if (response.data.conversation_id && !activeConversation) {
-      setActiveConversation(response.data.conversation_id);
-      await fetchConversations();
-    }
-  } catch (error) {
-    console.error('Error sending message:', error);
-    setMessages(prev => [...prev.slice(0, -1), {
-      ...userMessage,
-      response: error.response?.data?.message || "Sorry, I encountered an error. Please try again."
-    }]);
-  }
-};
-
-  // Handle file upload
-  const handleFileUpload = async (e) => {
+  // Handle file selection
+  const handleFileSelect = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
-
-    const formData = new FormData();
-    formData.append('file', file);
-    if (message) formData.append('query', message);
-    if (activeConversation) formData.append('conversation_id', activeConversation);
-
+    
+    if (file.size > 10 * 1024 * 1024) {
+      alert('File size exceeds 10MB limit');
+      return;
+    }
+    
     try {
-      const response = await fetch('http://127.0.0.1:8000/chat', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('jwtToken')}`
-        },
-        body: formData
-      });
-
-      const data = await response.json();
+      setIsLoading(true);
+      const formData = new FormData();
+      formData.append('file', file);
       
-      // Add to messages
-      setMessages(prev => [...prev, {
-        query: message || `File: ${file.name}`,
-        response: data.response,
-        timestamp: new Date().toLocaleTimeString()
-      }]);
-
-      // Clear input
-      setMessage('');
-      e.target.value = '';
-
-      // If new conversation, refresh list
-      if (data.conversation_id && !activeConversation) {
-        setActiveConversation(data.conversation_id);
-        await fetchConversations();
-      }
-    } catch (error) {
-      console.error('Error uploading file:', error);
-      setMessages(prev => [...prev, {
-        query: message || `File: ${file.name}`,
-        response: "Failed to process the file. Please try again.",
-        timestamp: new Date().toLocaleTimeString()
-      }]);
+      const response = await axios.post(`${API_BASE_URL}/api/upload`, formData, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      setSelectedFile({
+        name: file.name,
+        type: file.type,
+        url: response.data.fileUrl,
+        originalFile: file
+      });
+    } catch (err) {
+      console.error('File upload failed:', err);
+      alert('Failed to upload file');
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  // Audio recording
-  const toggleAudioRecording = async () => {
-    if (!isRecording) {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        const mediaRecorder = new MediaRecorder(stream);
-        mediaRecorderRef.current = mediaRecorder;
+  // Audio recording functions
+  const startRecording = () => {
+    navigator.mediaDevices.getUserMedia({ audio: true })
+      .then(stream => {
+        mediaRecorderRef.current = new MediaRecorder(stream);
         audioChunksRef.current = [];
-
-        mediaRecorder.ondataavailable = (e) => {
+        
+        mediaRecorderRef.current.ondataavailable = (e) => {
           audioChunksRef.current.push(e.data);
         };
-
-        mediaRecorder.onstop = async () => {
-          const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/m4a' });
-          const formData = new FormData();
-          formData.append('audio', audioBlob, 'recording.m4a');
-          if (activeConversation) formData.append('conversation_id', activeConversation);
-
-          try {
-            const response = await fetch('http://127.0.0.1:8000/api/chat', {
-              method: 'POST',
-              headers: {
-                'Authorization': `Bearer ${localStorage.getItem('jwtToken')}`
-              },
-              body: formData
-            });
-
-            const data = await response.json();
-            setMessages(prev => [...prev, {
-              query: '[Voice Message]',
-              response: data.response,
-              timestamp: new Date().toLocaleTimeString()
-            }]);
-
-            if (data.conversation_id && !activeConversation) {
-              setActiveConversation(data.conversation_id);
-              await fetchConversations();
-            }
-          } catch (error) {
-            console.error('Error sending audio:', error);
-          }
+        
+        mediaRecorderRef.current.onstop = async () => {
+          const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+          await processAudioRecording(audioBlob);
         };
-
-        mediaRecorder.start();
+        
+        mediaRecorderRef.current.start();
         setIsRecording(true);
-      } catch (error) {
-        console.error('Error accessing microphone:', error);
+      })
+      .catch(err => {
+        console.error('Error accessing microphone:', err);
+        alert('Microphone access denied');
+      });
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
+      setIsRecording(false);
+    }
+  };
+
+  const processAudioRecording = async (audioBlob) => {
+    try {
+      setIsLoading(true);
+      const formData = new FormData();
+      formData.append('audio', audioBlob, 'recording.webm');
+      
+      const response = await axios.post(`${API_BASE_URL}/api/chat/transcribe`, formData, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      setInput(response.data.transcribed || '');
+    } catch (err) {
+      console.error('Failed to process audio:', err);
+      alert('Failed to process audio');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Copy message to clipboard
+  const copyToClipboard = (text) => {
+    navigator.clipboard.writeText(text)
+      .catch(err => console.error('Failed to copy text:', err));
+  };
+
+  // Regenerate last response
+  const regenerateResponse = async () => {
+    if (messages.length === 0 || messages[messages.length - 1].sender !== 'bot') return;
+    
+    setIsLoading(true);
+    try {
+      const updatedMessages = messages.slice(0, -1);
+      setMessages(updatedMessages);
+      
+      const lastUserMessage = updatedMessages.reverse().find(m => m.sender === 'user');
+      if (lastUserMessage) {
+        setInput(lastUserMessage.content);
+        if (lastUserMessage.metadata) {
+          setSelectedFile({
+            name: lastUserMessage.metadata.fileUrl.split('/').pop(),
+            type: lastUserMessage.metadata.fileType,
+            url: lastUserMessage.metadata.fileUrl
+          });
+        }
+        setTimeout(sendMessage, 300);
       }
-    } else {
-      if (mediaRecorderRef.current) {
-        mediaRecorderRef.current.stop();
-        mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
-        setIsRecording(false);
-      }
+    } catch (err) {
+      console.error('Failed to regenerate response:', err);
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  // Timer functions
-  const updateTimerDisplay = (seconds) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    setTimer(`⏳ Timer: ${mins}m ${secs}s`);
-  };
-
-  const cancelTimer = () => {
-    if (socketRef.current) {
-      socketRef.current.emit('cancel_timer');
-      setTimer('⏳ Timer: Not Set');
-    }
-  };
-
-  const addTime = (seconds) => {
-    if (socketRef.current) {
-      socketRef.current.emit('add_time', { seconds });
-    }
-  };
-
-  // Handle key press
+  // Handle Enter key press
   const handleKeyPress = (e) => {
-    if (e.key === 'Enter') {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
       sendMessage();
     }
   };
 
+  // Loading and error states
+  if (isInitializing) {
+    return <div className="loading-screen">Loading...</div>;
+  }
+
+  if (error) {
+    return (
+      <div className="error-screen">
+        <p>{error}</p>
+        <button onClick={() => window.location.reload()}>Retry</button>
+        <button onClick={() => navigate('/login')}>Login</button>
+      </div>
+    );
+  }
+
   return (
     <div className="chatbot-container">
-      <div className="sidebar">
-        <div className="user-info">
-          <button className="back-button" onClick={() => navigate('/')}>
-            <FaArrowLeft /> Back to Dashboard
+      {/* Sidebar */}
+      <div className={`chatbot-sidebar ${showSidebar ? 'active' : ''}`}>
+        <div className="sidebar-header">
+          <button 
+            className="mobile-menu-btn"
+            onClick={() => setShowSidebar(!showSidebar)}
+            aria-label="Toggle sidebar"
+          >
+            {showSidebar ? '✕' : '☰'}
           </button>
-          {currentUser && <span id="username-display">Welcome, {currentUser}</span>}
+          <h3>Chat Sessions</h3>
+          <button 
+            className="new-chat-btn"
+            onClick={createNewSession}
+            disabled={isLoading}
+          >
+            + New Chat
+          </button>
         </div>
-        <div className="chat-history">
-          <h3>Chat History</h3>
-          <div id="chat-list">
-            {conversations.map(conv => (
-              <div 
-                key={conv.id} 
-                className={`chat-item ${activeConversation === conv.id ? 'active' : ''}`}
-                onClick={() => loadConversation(conv.id)}
-              >
-                <div className="chat-header">
-                  <div className="chat-preview">{conv.title}</div>
-                  <button 
-                    className="delete-chat-btn"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      deleteConversation(conv.id);
-                    }}
-                  >
-                    <FaTrash />
-                  </button>
-                </div>
-                <div className="chat-time">{conv.last_updated}</div>
+        
+        <div className="chat-sessions">
+          {chatSessions.map(session => (
+            <div 
+              key={session.sessionId}
+              className={`session-item ${currentSession?.sessionId === session.sessionId ? 'active' : ''}`}
+              onClick={() => loadChatSession(session.sessionId)}
+            >
+              <div className="session-preview">
+                {session.title || session.messages[0]?.content.substring(0, 50) || 'New Chat'}
               </div>
-            ))}
-          </div>
-        </div>
-      </div>
-      
-      <div className="main-content">
-        <h1>AI Study Buddy</h1>
-        <div id="chat-container" ref={chatContainerRef}>
-          {messages.map((msg, index) => (
-            <React.Fragment key={index}>
-              <div className="message user">
-                <p>{msg.query}</p>
-                <span className="timestamp">{msg.timestamp}</span>
+              <div className="session-meta">
+                <span>{new Date(session.updatedAt).toLocaleString()}</span>
+                <button 
+                  className="delete-session-btn"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    deleteChatSession(session.sessionId);
+                  }}
+                  aria-label="Delete chat session"
+                  disabled={isLoading}
+                >
+                  <FaTrash />
+                </button>
               </div>
-              {msg.response && (
-                <div className="message assistant">
-                  <p>{msg.response}</p>
-                  <span className="timestamp">{msg.timestamp}</span>
-                </div>
-              )}
-            </React.Fragment>
+            </div>
           ))}
         </div>
-        <div className="input-area">
-          <input 
-            type="text" 
-            id="user-input" 
-            placeholder="Type your message..." 
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-            onKeyPress={handleKeyPress}
-          />
+        
+        <div className="user-info">
+          <div className="username">{user || 'User'}</div>
           <button 
-            id="attachment-btn" 
-            className="icon-btn" 
-            onClick={() => document.getElementById('file-input').click()}
-            title="Attach file"
+            className="logout-btn"
+            onClick={() => {
+              localStorage.removeItem('token');
+              localStorage.removeItem('username');
+              window.location.reload();
+            }}
           >
-            <FaPaperclip />
+            Logout
           </button>
-          <input 
-            type="file" 
-            id="file-input" 
-            style={{ display: 'none' }} 
-            onChange={handleFileUpload}
-            accept=".pdf,.docx,.txt,image/*"
-          />
-          <button 
-            id="audio-btn" 
-            className={`icon-btn ${isRecording ? 'recording' : ''}`}
-            onClick={toggleAudioRecording} 
-            title={isRecording ? "Stop recording" : "Voice message"}
-          >
-            {isRecording ? <FaStop /> : <FaMicrophone />}
-          </button>
-          <button id="send-btn" onClick={sendMessage}>Send</button>
-        </div>
-        <div id="timer-controls">
-          <div id="timer">{timer}</div>
-          <div className="timer-buttons">
-            <button onClick={cancelTimer}>Cancel</button>
-            <button onClick={() => addTime(60)}>+1 min</button>
-            <button onClick={() => addTime(300)}>+5 min</button>
-          </div>
         </div>
       </div>
       
-      {showAlert && (
-        <div id="alert-overlay" className="alert-overlay">
-          <div className="alert-popup">
-            <h2 className="alert-title">Time's Up!</h2>
-            <p className="alert-message">Your study session has ended. Take a break or start a new session.</p>
-            <button className="alert-btn" onClick={dismissAlert}>Dismiss</button>
+      {/* Main chat area */}
+      <div className="chatbot-main">
+        {isNewChat && messages.length === 0 ? (
+          <div className="welcome-message">
+            <h2>Welcome to Math Study Assistant</h2>
+            <p>How can I help you with your math studies today?</p>
+            <div className="suggestions">
+              <button onClick={() => setInput('Explain the Pythagorean theorem')}>
+                Explain the Pythagorean theorem
+              </button>
+              <button onClick={() => setInput('Help me solve 2x + 5 = 15')}>
+                Help me solve 2x + 5 = 15
+              </button>
+              <button onClick={() => setInput('Create a study schedule for calculus')}>
+                Create a study schedule
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="messages-container">
+            {messages.map((message, index) => (
+              <div 
+                key={index}
+                className={`message ${message.sender}`}
+              >
+                <div className="message-content">
+                  {message.metadata?.fileType?.startsWith('image/') && (
+                    <div className="file-preview">
+                      <img 
+                        src={`${API_BASE_URL}${message.metadata.fileUrl}`} 
+                        alt="Uploaded content" 
+                      />
+                    </div>
+                  )}
+                  
+                  {message.metadata?.fileType && !message.metadata.fileType.startsWith('image/') && (
+                    <div className="file-preview">
+                      <a 
+                        href={`${API_BASE_URL}${message.metadata.fileUrl}`} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                      >
+                        📄 {message.metadata.fileUrl.split('/').pop()}
+                      </a>
+                    </div>
+                  )}
+                  
+                  <div className="message-text">
+                    {message.content.split('\n').map((paragraph, i) => (
+                      <p key={i}>{paragraph}</p>
+                    ))}
+                  </div>
+                  
+                  <div className="message-actions">
+                    <span className="timestamp">
+                      {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                    <button 
+                      className="copy-btn"
+                      onClick={() => copyToClipboard(message.content)}
+                      aria-label="Copy message"
+                    >
+                      <FaRegCopy />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+            
+            {isLoading && (
+              <div className="message bot">
+                <div className="message-content">
+                  <div className="typing-indicator">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            <div ref={messagesEndRef} />
+          </div>
+        )}
+        
+        {/* Input area */}
+        <div className="input-area">
+          {selectedFile && (
+            <div className="file-preview-input">
+              <span>{selectedFile.name}</span>
+              <button 
+                onClick={() => setSelectedFile(null)}
+                aria-label="Remove file"
+                disabled={isLoading}
+              >
+                ×
+              </button>
+            </div>
+          )}
+          
+          <div className="input-container">
+            <textarea
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={handleKeyPress}
+              placeholder="Type your message here..."
+              disabled={isLoading}
+              aria-label="Message input"
+            />
+            
+            <div className="input-buttons">
+              <button 
+                className={`record-btn ${isRecording ? 'recording' : ''}`}
+                onClick={isRecording ? stopRecording : startRecording}
+                disabled={isLoading}
+                aria-label={isRecording ? "Stop recording" : "Start recording"}
+              >
+                {isRecording ? <BsStopFill /> : <FaMicrophone />}
+              </button>
+              
+              <button 
+                className="attach-btn"
+                onClick={() => fileInputRef.current.click()}
+                disabled={isLoading}
+                aria-label="Attach file"
+              >
+                <FaPaperclip />
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={handleFileSelect}
+                  accept="image/*,.pdf,.doc,.docx,.txt"
+                  style={{ display: 'none' }}
+                />
+              </button>
+              
+              {messages.length > 0 && (
+                <button 
+                  className="regenerate-btn"
+                  onClick={regenerateResponse}
+                  disabled={isLoading}
+                  aria-label="Regenerate response"
+                >
+                  <IoMdRefresh />
+                </button>
+              )}
+              
+              <button 
+                className="send-btn"
+                onClick={sendMessage}
+                disabled={isLoading || (!input.trim() && !selectedFile)}
+                aria-label="Send message"
+              >
+                <FaPaperPlane />
+              </button>
+            </div>
           </div>
         </div>
-      )}
-      
-      <audio id="alarm-sound" ref={alarmSoundRef} loop>
-        <source src="/alarm-301729.mp3" type="audio/mpeg" />
-      </audio>
+      </div>
     </div>
   );
 };

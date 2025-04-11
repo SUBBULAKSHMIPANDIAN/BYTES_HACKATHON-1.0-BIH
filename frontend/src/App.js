@@ -61,6 +61,11 @@ function App() {
             <Chatbot />
           </ProtectedRoute>
         } />
+        <Route path="/login" element={
+          <ProtectedRoute isAuthenticated={isAuthenticated}>
+            <Chatbot />
+          </ProtectedRoute>
+        } />
         
       </Routes>
     </Router>
