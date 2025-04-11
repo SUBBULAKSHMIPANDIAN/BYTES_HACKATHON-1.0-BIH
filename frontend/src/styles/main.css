@@ -191,7 +191,7 @@ body {
 .calculator-buttons button {
   flex: 1;
   padding: 0.5rem;
-  background: #3498db;
+  background: linear-gradient(to right, #43cea2, #185a9d);
   color: white;
   border: none;
   border-radius: 4px;
@@ -199,9 +199,7 @@ body {
   transition: background-color 0.3s;
 }
 
-.calculator-buttons button:hover {
-  background: #2980b9;
-}
+
 
 .calculator-result {
   margin-top: 1rem;

@@ -1,4 +1,4 @@
-/* EXISTING STYLES — NO CHANGES MADE */
+
 
 .notes-section {
   background: white;
@@ -128,7 +128,7 @@
 }
 
 .add-note-button {
-  background: #4CAF50;
+  background: linear-gradient(to right, #43cea2, #185a9d);
   color: white;
   border: none;
   padding: 10px 15px;
@@ -139,7 +139,7 @@
 }
 
 .add-note-button:hover {
-  background: #45a049;
+  background: linear-gradient(to right, #37d0a0, #185a9d);
 }
 
 .floating-button {
