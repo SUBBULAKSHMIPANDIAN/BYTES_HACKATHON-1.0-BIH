@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import api from '../../api';
 import '../../styles/dashboard.css';
-import { FaTimes, FaSave, FaTrash } from 'react-icons/fa';
+import { FaTimes, FaSave ,FaTrash} from 'react-icons/fa';
 
 const Notes = () => {
   const [notes, setNotes] = useState([]);
@@ -16,9 +16,12 @@ const Notes = () => {
     const fetchNotes = async () => {
       try {
         const username = localStorage.getItem('username');
-        if (!username) throw new Error('Username not found in local storage');
+        if (!username) {
+          throw new Error('Username not found in local storage');
+        }
 
         const response = await api.get(`/notes/${username}`);
+        
         if (isMounted) {
           setNotes(response.data?.notes || []);
           setIsLoading(false);
@@ -33,6 +36,7 @@ const Notes = () => {
     };
 
     fetchNotes();
+
     return () => {
       isMounted = false;
     };
@@ -47,17 +51,19 @@ const Notes = () => {
       setError('Content cannot be empty');
       return;
     }
-
+    
     try {
       const username = localStorage.getItem('username');
-      if (!username) throw new Error('Username not found in local storage');
+      if (!username) {
+        throw new Error('Username not found in local storage');
+      }
 
       const response = await api.post('/notes', {
         username,
         title: activeNote.title.trim(),
         content: activeNote.content.trim()
       });
-
+      
       if (response.data?.note) {
         setNotes([response.data.note, ...notes]);
         setActiveNote(null);
@@ -81,15 +87,17 @@ const Notes = () => {
       setError('Content cannot be empty');
       return;
     }
-
+    
     try {
       const response = await api.put(`/notes/${activeNote._id}`, {
         title: activeNote.title.trim(),
         content: activeNote.content.trim()
       });
-
+      
       if (response.data?.note) {
-        setNotes(notes.map(note => note._id === activeNote._id ? response.data.note : note));
+        setNotes(notes.map(note => 
+          note._id === activeNote._id ? response.data.note : note
+        ));
         setActiveNote(null);
         setIsModalOpen(false);
         setError('');
@@ -135,18 +143,18 @@ const Notes = () => {
     <div className="notes-section">
       <h3>Notes</h3>
       {error && !isModalOpen && <div className="error-message">{error}</div>}
-
+      
       <div className="items-list">
         {notes.length > 0 ? (
           notes.map((note) => (
-            <div
-              key={note._id}
+            <div 
+              key={note._id} 
               className="note-card"
               onClick={() => openNoteModal(note)}
             >
               <div className="note-header">
                 <h4 className="note-title">{note.title}</h4>
-                <button
+                <button 
                   className="icon-button delete-button"
                   onClick={(e) => {
                     e.stopPropagation();
@@ -157,8 +165,8 @@ const Notes = () => {
                 </button>
               </div>
               <p className="note-preview">
-                {note.content.length > 50
-                  ? `${note.content.substring(0, 50)}...`
+                {note.content.length > 50 
+                  ? `${note.content.substring(0, 50)}...` 
                   : note.content}
               </p>
               {note.createdAt && (
@@ -171,7 +179,10 @@ const Notes = () => {
         ) : (
           <div className="empty-notes">
             <p>No notes yet.</p>
-            <button className="add-note-button" onClick={() => openNoteModal()}>
+            <button 
+              className="add-note-button"
+              onClick={() => openNoteModal()}
+            >
               Add New Note
             </button>
           </div>
@@ -183,35 +194,47 @@ const Notes = () => {
           <div className="note-modal">
             <div className="modal-header">
               <h3>{activeNote?._id ? 'Edit Note' : 'Add New Note'}</h3>
-              <button className="icon-button close-button" onClick={() => setIsModalOpen(false)}>
+              <button 
+                className="icon-button close-button"
+                onClick={() => setIsModalOpen(false)}
+              >
                 <FaTimes />
               </button>
             </div>
-
+            
             <div className="modal-body">
               <input
                 type="text"
                 placeholder="Note title"
                 value={activeNote?.title || ''}
-                onChange={(e) => setActiveNote({ ...activeNote, title: e.target.value })}
+                onChange={(e) => setActiveNote({
+                  ...activeNote,
+                  title: e.target.value
+                })}
                 className="modal-input"
               />
               <textarea
                 placeholder="Note content"
                 value={activeNote?.content || ''}
-                onChange={(e) => setActiveNote({ ...activeNote, content: e.target.value })}
+                onChange={(e) => setActiveNote({
+                  ...activeNote,
+                  content: e.target.value
+                })}
                 className="modal-textarea"
               />
               {error && <div className="error-message">{error}</div>}
             </div>
-
+            
             <div className="modal-footer">
               {activeNote?._id && (
-                <button className="delete-button" onClick={() => handleDeleteNote(activeNote._id)}>
+                <button 
+                  className="delete-button"
+                  onClick={() => handleDeleteNote(activeNote._id)}
+                >
                   <FaTrash /> Delete
                 </button>
               )}
-              <button
+              <button 
                 className="save-button"
                 onClick={activeNote?._id ? handleUpdateNote : handleAddNote}
               >
@@ -223,7 +246,10 @@ const Notes = () => {
       )}
 
       {notes.length > 0 && (
-        <button className="add-note-button floating-button" onClick={() => openNoteModal()}>
+        <button 
+          className="add-note-button floating-button"
+          onClick={() => openNoteModal()}
+        >
           + Add Note
         </button>
       )}

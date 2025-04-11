@@ -1,10 +1,25 @@
+/* App Component Styles - Windows + Mobile Friendly */
 .App {
   text-align: center;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background-color: #f5f5f5;
+  color: #333;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-smooth: always;
+  padding: 1rem;
+  box-sizing: border-box;
 }
 
+/* Logo Animation */
 .App-logo {
-  height: 40vmin;
+  height: 150px;
   pointer-events: none;
+  margin-top: 2rem;
+  transition: all 0.3s ease-in-out;
 }
 
 @media (prefers-reduced-motion: no-preference) {
@@ -13,26 +28,74 @@
   }
 }
 
-.App-header {
-  background-color: #282c34;
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  font-size: calc(10px + 2vmin);
-  color: white;
-}
-
-.App-link {
-  color: #61dafb;
-}
-
 @keyframes App-logo-spin {
   from {
     transform: rotate(0deg);
   }
   to {
     transform: rotate(360deg);
+  }
+}
+
+/* Header Styling */
+.App-header {
+  background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  color: white;
+  text-align: center;
+}
+
+/* Link Styling */
+.App-link {
+  color: #00b4db;
+  text-decoration: none;
+  font-weight: bold;
+  transition: color 0.3s;
+  margin-top: 1rem;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.App-link:hover {
+  color: #009ac6;
+}
+
+/* ===================== Responsive Design ===================== */
+
+@media (max-width: 768px) {
+  .App {
+    padding: 1rem;
+  }
+
+  .App-logo {
+    height: 100px;
+    margin-top: 1rem;
+  }
+
+  .App-header {
+    padding: 1.5rem 1rem;
+  }
+
+  .App-link {
+    font-size: 1rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .App-logo {
+    height: 80px;
+  }
+
+  .App-header {
+    font-size: 1rem;
+    padding: 1rem;
+  }
+
+  .App-link {
+    font-size: 0.9rem;
   }
 }
