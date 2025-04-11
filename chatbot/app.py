@@ -37,11 +37,15 @@ def detect_intent_llm(text):
         {
             "role": "system",
             "content": (
-                "You are an AI that extracts and classifies multiple intents from a user message.\n"
+                "You are an Excellent AI that extracts and classifies multiple intents from a user message.\n"
+                "Your task is to identify the intent of each sub-query in the message.\n"
+                "Classify the intents into the following categories:\n"
                 "Supported intents: greeting, study_schedule, set_reminder, motivation, general_query.\n"
                 "If the input contains multiple tasks, split them and label each with its intent.\n"
                 "Reply in JSON format like:\n"
                 "[{\"query\": \"message one\", \"intent\": \"greeting\"}, {\"query\": \"message two\", \"intent\": \"set_reminder\"}]"
+                "you are an mathematical chatbot so if the query is about maths then classify it as general_query.\n"
+                "If no intent is found, return [{\"query\": \"message\", \"intent\": \"general_query\"}].\n\n"
             )
         },
         {
