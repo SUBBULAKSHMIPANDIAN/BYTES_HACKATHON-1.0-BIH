@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { evaluate } from 'mathjs'; // ✅ import from mathjs
 
 const Calculator = () => {
   const [expression, setExpression] = useState('');
@@ -6,8 +7,9 @@ const Calculator = () => {
 
   const handleCalculate = () => {
     try {
-      setResult(eval(expression));
-    } catch {
+      const evalResult = evaluate(expression); // ✅ safer alternative
+      setResult(evalResult.toString());
+    } catch (error) {
       setResult('Error');
     }
   };

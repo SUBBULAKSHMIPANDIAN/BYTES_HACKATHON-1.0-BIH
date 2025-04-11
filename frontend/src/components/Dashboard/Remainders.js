@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
@@ -7,39 +7,37 @@ const Reminders = () => {
   const [reminder, setReminder] = useState({ date: '', time: '', note: '' });
   const [reminders, setReminders] = useState([]);
 
-  // ✅ Set userId on mount
+  const remindersRef = useRef(reminders);
+
   useEffect(() => {
     const uid = localStorage.getItem('username');
     if (uid) {
       setUserId(uid);
-    }
-  }, []);
 
-  // ✅ Load reminders when userId is set
-  useEffect(() => {
-    if (userId) {
-      const stored = localStorage.getItem(`reminders-${userId}`);
+      const stored = localStorage.getItem(`reminders-${uid}`);
       if (stored) {
         setReminders(JSON.parse(stored));
       }
     }
-  }, [userId]);
+  }, []);
 
-  // ✅ Save reminders to localStorage when reminders change
+  useEffect(() => {
+    remindersRef.current = reminders;
+  }, [reminders]);
+
   useEffect(() => {
     if (userId) {
       localStorage.setItem(`reminders-${userId}`, JSON.stringify(reminders));
     }
   }, [reminders, userId]);
 
-  // ✅ Reminder notification check
   useEffect(() => {
     const interval = setInterval(() => {
       const now = new Date();
       const currentDate = now.toISOString().split('T')[0];
       const currentTime = now.toTimeString().slice(0, 5);
 
-      reminders.forEach((rem, index) => {
+      remindersRef.current.forEach((rem, index) => {
         if (rem.date === currentDate && rem.time === currentTime && !rem.notified) {
           toast.info(`🔔 Reminder: ${rem.note}`, {
             position: "top-right",
@@ -57,10 +55,10 @@ const Reminders = () => {
           });
         }
       });
-    }, 60000); // every minute
+    }, 60000);
 
     return () => clearInterval(interval);
-  }, [reminders]);
+  }, []);
 
   const handleAddReminder = () => {
     if (reminder.date && reminder.time && reminder.note.trim()) {

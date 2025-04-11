@@ -12,6 +12,8 @@ function Timer() {
   const hourRef = useRef(null);
   const minuteRef = useRef(null);
   const secondRef = useRef(null);
+  const [touchStartY, setTouchStartY] = useState(0);
+  const [touchEndY, setTouchEndY] = useState(0);
 
   const [totalTime, setTotalTime] = useState(0);
 
@@ -57,6 +59,30 @@ function Timer() {
   const handleWheel = (type) => (e) => {
     e.preventDefault();
     const direction = e.deltaY > 0 ? -1 : 1;
+    updateTime(type, direction);
+  };
+
+  const handleTouchStart = (e) => {
+    setTouchStartY(e.targetTouches[0].clientY);
+  };
+
+  const handleTouchMove = (type) => (e) => {
+    setTouchEndY(e.targetTouches[0].clientY);
+  };
+
+  const handleTouchEnd = (type) => (e) => {
+    if (touchStartY - touchEndY > 15) {
+      // Swipe up - increase
+      updateTime(type, 1);
+    } else if (touchEndY - touchStartY > 15) {
+      // Swipe down - decrease
+      updateTime(type, -1);
+    }
+    setTouchStartY(0);
+    setTouchEndY(0);
+  };
+
+  const updateTime = (type, direction) => {
     let newHrs = hours, newMins = minutes, newSecs = seconds;
 
     if (type === 'hours') {
@@ -114,7 +140,7 @@ function Timer() {
       textAlign: 'center',
       boxShadow: '0 12px 30px rgba(0,0,0,0.3)',
       width: '380px',
-      minHeight: '480px', // Increased from 420px to 480px
+      minHeight: '480px',
       display: 'flex',
       flexDirection: 'column',
       justifyContent: 'space-between',
@@ -122,14 +148,14 @@ function Timer() {
     timeDisplay: {
       display: 'flex',
       gap: '10px',
-      margin: '30px 0', // Increased margin for better spacing
+      margin: '30px 0',
       alignItems: 'center',
       justifyContent: 'center',
     },
     timeUnit: {
-      fontSize: '42px', // Slightly larger font
-      width: '90px', // Slightly wider
-      height: '90px', // Slightly taller
+      fontSize: '42px',
+      width: '90px',
+      height: '90px',
       borderRadius: '15px',
       background: 'rgba(255,255,255,0.15)',
       display: 'flex',
@@ -137,22 +163,23 @@ function Timer() {
       alignItems: 'center',
       cursor: 'ns-resize',
       userSelect: 'none',
+      touchAction: 'none', // Important for touch events
     },
     controlButtons: {
       display: 'flex',
       gap: '10px',
       justifyContent: 'center',
-      margin: '20px 0', // Increased margin
+      margin: '20px 0',
     },
     button: {
-      padding: '12px 18px', // Slightly larger buttons
+      padding: '12px 18px',
       borderRadius: '10px',
       border: 'none',
       background: 'linear-gradient(45deg, #43cea2, #185a9d)',
       color: '#fff',
       fontWeight: 'bold',
       cursor: 'pointer',
-      fontSize: '16px', // Slightly larger font
+      fontSize: '16px',
     },
     disabledButton: {
       background: '#ccc',
@@ -164,7 +191,7 @@ function Timer() {
       background: '#ddd',
       borderRadius: '20px',
       overflow: 'hidden',
-      marginTop: '30px', // Increased margin
+      marginTop: '30px',
       position: 'relative',
     },
     toyRunner: {
@@ -173,43 +200,97 @@ function Timer() {
       top: '-15px',
       transition: 'left 1s linear',
       fontSize: '30px',
+    },
+    // Mobile-specific styles
+    '@media (max-width: 480px)': {
+      timerBox: {
+        width: '90vw',
+        padding: '30px 20px',
+        minHeight: 'auto',
+      },
+      timeUnit: {
+        fontSize: '32px',
+        width: '70px',
+        height: '70px',
+      },
+      button: {
+        padding: '10px 15px',
+        fontSize: '14px',
+      },
+    }
+  };
+
+  // Apply responsive styles
+  const responsiveStyles = {
+    ...styles,
+    timerBox: {
+      ...styles.timerBox,
+      ...(window.innerWidth <= 480 ? {
+        width: '90vw',
+        padding: '30px 20px',
+        minHeight: 'auto',
+      } : {})
+    },
+    timeUnit: {
+      ...styles.timeUnit,
+      ...(window.innerWidth <= 480 ? {
+        fontSize: '32px',
+        width: '70px',
+        height: '70px',
+      } : {})
+    },
+    button: {
+      ...styles.button,
+      ...(window.innerWidth <= 480 ? {
+        padding: '10px 15px',
+        fontSize: '14px',
+      } : {})
     }
   };
 
   return (
-    <div style={styles.container}>
-      <div style={styles.timerBox}>
+    <div style={responsiveStyles.container}>
+      <div style={responsiveStyles.timerBox}>
         <h2 style={{ fontSize: '1.8rem', marginBottom: '10px' }}>🧘 Focus Timer</h2>
-        <div style={styles.timeDisplay}>
+        <div style={responsiveStyles.timeDisplay}>
           <div
             ref={hourRef}
-            style={styles.timeUnit}
+            style={responsiveStyles.timeUnit}
             onWheel={handleWheel('hours')}
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove('hours')}
+            onTouchEnd={handleTouchEnd('hours')}
           >
             {String(hours).padStart(2, '0')}
           </div>
           <span style={{ fontSize: '36px' }}>:</span>
           <div
             ref={minuteRef}
-            style={styles.timeUnit}
+            style={responsiveStyles.timeUnit}
             onWheel={handleWheel('minutes')}
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove('minutes')}
+            onTouchEnd={handleTouchEnd('minutes')}
           >
             {String(minutes).padStart(2, '0')}
           </div>
           <span style={{ fontSize: '36px' }}>:</span>
           <div
             ref={secondRef}
-            style={styles.timeUnit}
+            style={responsiveStyles.timeUnit}
             onWheel={handleWheel('seconds')}
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove('seconds')}
+            onTouchEnd={handleTouchEnd('seconds')}
           >
             {String(seconds).padStart(2, '0')}
           </div>
         </div>
         <div>
-          <div style={styles.controlButtons}>
+          <div style={responsiveStyles.controlButtons}>
             {!isRunning && isTimeSet && (
               <button
-                style={timeLeft === 0 ? { ...styles.button, ...styles.disabledButton } : styles.button}
+                style={timeLeft === 0 ? { ...responsiveStyles.button, ...responsiveStyles.disabledButton } : responsiveStyles.button}
                 onClick={startTimer}
                 disabled={timeLeft === 0}
               >
@@ -217,17 +298,17 @@ function Timer() {
               </button>
             )}
             {isRunning && (
-              <button style={styles.button} onClick={pauseTimer}>⏸ Pause</button>
+              <button style={responsiveStyles.button} onClick={pauseTimer}>⏸ Pause</button>
             )}
-            <button style={styles.button} onClick={resetTimer}>🔁 Reset</button>
+            <button style={responsiveStyles.button} onClick={resetTimer}>🔁 Reset</button>
           </div>
-          <div style={styles.controlButtons}>
-            <button style={styles.button} onClick={() => setPresetTime(0.5)}>30 Min</button>
-            <button style={styles.button} onClick={() => setPresetTime(1)}>1 Hr</button>
+          <div style={responsiveStyles.controlButtons}>
+            <button style={responsiveStyles.button} onClick={() => setPresetTime(0.5)}>30 Min</button>
+            <button style={responsiveStyles.button} onClick={() => setPresetTime(1)}>1 Hr</button>
           </div>
         </div>
-        <div style={styles.progressBar}>
-          <div style={styles.toyRunner}>🏃</div>
+        <div style={responsiveStyles.progressBar}>
+          <div style={responsiveStyles.toyRunner}>🏃</div>
         </div>
       </div>
     </div>
