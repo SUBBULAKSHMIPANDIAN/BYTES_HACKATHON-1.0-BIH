@@ -5,250 +5,44 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Study Buddy</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
-    <style>
-        :root {
-            --bg-color: #1a1a2e;
-            --card-bg: #16213e;
-            --accent-color: #0f3460;
-            --text-color: #e0e0e0;
-            --user-msg-bg: #4361ee;
-            --bot-msg-bg: #2d2d44;
-            --input-bg: #1f1f35;
-            --button-bg: #4361ee;
-            --button-hover: #3a56de;
-            --alert-bg: rgba(15, 52, 96, 0.95);
-            --alert-border: #4361ee;
-        }
-        
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: var(--bg-color);
-            color: var(--text-color);
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            padding: 20px;
-        }
-        
-        h1 {
-            margin: 20px 0;
-            font-size: 32px;
-            color: #fff;
-            text-shadow: 0 0 10px rgba(67, 97, 238, 0.5);
-        }
-        
-        #chat-container {
-            width: 100%;
-            max-width: 600px;
-            height: 60vh;
-            background-color: var(--card-bg);
-            border-radius: 15px;
-            padding: 20px;
-            margin-bottom: 15px;
-            overflow-y: auto;
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
-            display: flex;
-            flex-direction: column;
-        }
-        
-        .message {
-            margin: 8px 0;
-            padding: 12px 15px;
-            border-radius: 18px;
-            max-width: 80%;
-            word-wrap: break-word;
-            animation: fadeIn 0.3s ease-in-out;
-        }
-        
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        
-        .user {
-            background: var(--user-msg-bg);
-            color: white;
-            align-self: flex-end;
-            border-bottom-right-radius: 5px;
-            margin-left: auto;
-        }
-        
-        .bot {
-            background: var(--bot-msg-bg);
-            color: var(--text-color);
-            align-self: flex-start;
-            border-bottom-left-radius: 5px;
-            margin-right: auto;
-        }
-        
-        .input-area {
-            width: 100%;
-            max-width: 600px;
-            display: flex;
-            margin-bottom: 20px;
-        }
-        
-        #user-input {
-            flex-grow: 1;
-            padding: 15px;
-            border: none;
-            border-radius: 10px 0 0 10px;
-            background-color: var(--input-bg);
-            color: var(--text-color);
-            font-size: 16px;
-            outline: none;
-            transition: all 0.3s;
-        }
-        
-        #user-input:focus {
-            box-shadow: 0 0 0 2px var(--accent-color);
-        }
-        
-        button {
-            padding: 15px 25px;
-            background-color: var(--button-bg);
-            color: white;
-            border: none;
-            border-radius: 0 10px 10px 0;
-            cursor: pointer;
-            font-size: 16px;
-            font-weight: bold;
-            transition: background-color 0.3s;
-        }
-        
-        button:hover {
-            background-color: var(--button-hover);
-        }
-        
-        #timer {
-            font-size: 24px;
-            margin-top: 20px;
-            font-weight: bold;
-            padding: 10px 20px;
-            background-color: var(--accent-color);
-            border-radius: 10px;
-            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-            transition: all 0.3s;
-        }
-        
-        #timer.active {
-            animation: pulse 2s infinite;
-        }
-        
-        @keyframes pulse {
-            0% { box-shadow: 0 0 0 0 rgba(67, 97, 238, 0.7); }
-            70% { box-shadow: 0 0 0 10px rgba(67, 97, 238, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(67, 97, 238, 0); }
-        }
-        
-        /* Custom scrollbar */
-        #chat-container::-webkit-scrollbar {
-            width: 8px;
-        }
-        
-        #chat-container::-webkit-scrollbar-track {
-            background: var(--card-bg);
-        }
-        
-        #chat-container::-webkit-scrollbar-thumb {
-            background-color: var(--accent-color);
-            border-radius: 10px;
-        }
-        
-        /* Alert popup styling */
-        .alert-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0, 0, 0, 0.7);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            z-index: 1000;
-            opacity: 0;
-            visibility: hidden;
-            transition: all 0.3s ease-in-out;
-        }
-        
-        .alert-overlay.active {
-            opacity: 1;
-            visibility: visible;
-        }
-        
-        .alert-popup {
-            background-color: var(--alert-bg);
-            border: 2px solid var(--alert-border);
-            border-radius: 15px;
-            padding: 30px;
-            max-width: 400px;
-            width: 90%;
-            text-align: center;
-            box-shadow: 0 5px 30px rgba(0, 0, 0, 0.3);
-            transform: scale(0.9);
-            transition: transform 0.3s ease-in-out;
-            animation: shake 0.5s ease-in-out;
-        }
-        
-        .alert-overlay.active .alert-popup {
-            transform: scale(1);
-        }
-        
-        @keyframes shake {
-            0%, 100% { transform: translateX(0); }
-            10%, 30%, 50%, 70%, 90% { transform: translateX(-10px); }
-            20%, 40%, 60%, 80% { transform: translateX(10px); }
-        }
-        
-        .alert-title {
-            font-size: 28px;
-            color: #fff;
-            margin-bottom: 15px;
-        }
-        
-        .alert-message {
-            font-size: 18px;
-            margin-bottom: 25px;
-            line-height: 1.5;
-        }
-        
-        .alert-btn {
-            background-color: #e63946;
-            color: white;
-            border: none;
-            padding: 12px 25px;
-            border-radius: 8px;
-            font-size: 16px;
-            font-weight: bold;
-            cursor: pointer;
-            transition: background-color 0.3s;
-        }
-        
-        .alert-btn:hover {
-            background-color: #c1121f;
-        }
-    </style>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.2.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='s.css') }}">
 </head>
 <body>
-
-    <h1>Study Buddy</h1>
-    <div id="chat-container"></div>
-    <div class="input-area">
-        <input type="text" id="user-input" placeholder="Type your message..." onkeypress="handleKeyPress(event)">
-        <button onclick="sendMessage()">Send</button>
+    <div class="sidebar">
+        <div class="user-info">
+            <span id="username-display"></span>
+        </div>
+        <div class="chat-history">
+            <h3>Chat History</h3>
+            <div id="chat-list"></div>
+        </div>
     </div>
     
-    <div id="timer">⏳ Timer: Not Set</div>
+    <div class="main-content">
+        <h1>AI Study Buddy</h1>
+        <div id="chat-container"></div>
+        <div class="input-area">
+            <input type="text" id="user-input" placeholder="Type your message..." onkeypress="handleKeyPress(event)">
+            <button id="attachment-btn" class="icon-btn" onclick="triggerFileInput()" title="Attach file">
+                <i class="fas fa-paperclip"></i>
+            </button>
+            <button id="audio-btn" class="icon-btn" onclick="toggleAudioRecording()" title="Voice message">
+                <i class="fas fa-microphone"></i>
+            </button>
+            <button id="send-btn" onclick="sendMessage()">Send</button>
+            <input type="file" id="file-input" style="display: none;" onchange="handleFileSelection(this)">
+        </div>
+        <div id="timer-controls">
+            <div id="timer">⏳ Timer: Not Set</div>
+            <div class="timer-buttons">
+                <button onclick="cancelTimer()">Cancel</button>
+                <button onclick="addTime(60)">+1 min</button>
+                <button onclick="addTime(300)">+5 min</button>
+            </div>
+        </div>
+    </div>
     
-    <!-- Alert Popup -->
     <div id="alert-overlay" class="alert-overlay">
         <div class="alert-popup">
             <h2 class="alert-title">Time's Up!</h2>
@@ -257,94 +51,267 @@
         </div>
     </div>
     
-    <!-- Audio element for alarm -->
     <audio id="alarm-sound" loop>
-        <!-- src will be provided by you -->
+        <source src="{{ url_for('static', filename='alarm-301729.mp3') }}" type="audio/mpeg">
     </audio>
-
+    
     <script>
-        const socket = io.connect("http://localhost:5000");
-        let timerInterval;
-        const alarmSound = document.getElementById("alarm-sound");
-        const alertOverlay = document.getElementById("alert-overlay");
-
-        function handleKeyPress(event) {
-            if (event.key === "Enter") sendMessage();
-        }
-
-        function sendMessage() {
-            const userInput = document.getElementById("user-input").value;
-            if (!userInput) return;
-
-            appendMessage(userInput, "user");
-            document.getElementById("user-input").value = "";
-
-            fetch("/chat", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ query: userInput })
-            })
-            .then(response => response.json())
-            .then(data => appendMessage(data.response, "bot"));
-        }
-
-        function appendMessage(text, sender) {
-            const chatContainer = document.getElementById("chat-container");
-            const messageDiv = document.createElement("div");
-            messageDiv.className = `message ${sender}`;
-            messageDiv.innerText = text;
-            chatContainer.appendChild(messageDiv);
-            chatContainer.scrollTop = chatContainer.scrollHeight;
-        }
-
-        socket.on("start_timer", function(data) {
-            let timeLeft = data.seconds;
-            updateTimerDisplay(timeLeft);
-
-            clearInterval(timerInterval);
-            timerInterval = setInterval(() => {
-                timeLeft--;
-                updateTimerDisplay(timeLeft);
-                if (timeLeft <= 0) {
-                    clearInterval(timerInterval);
-                    showAlert();
-                }
-            }, 1000);
-            
-            document.getElementById("timer").classList.add("active");
-        });
-
-        socket.on("timer_finished", function(data) {
-            updateTimerDisplay(0);
-            appendMessage(data.message, "bot");
-            document.getElementById("timer").classList.remove("active");
-            showAlert();
-        });
-
-        function updateTimerDisplay(seconds) {
-            const timerDisplay = document.getElementById("timer");
-            timerDisplay.innerText = `⏳ Timer: ${seconds > 0 ? seconds + "s remaining" : "Finished!"}`;
+        // Get JWT token from localStorage
+        const token = localStorage.getItem('jwtToken');
+        let currentUser = null;
+        
+        // Decode JWT to get username
+        if (token) {
+            const payload = JSON.parse(atob(token.split('.')[1]));
+            currentUser = payload.username;
+            document.getElementById('username-display').textContent = `Welcome, ${currentUser}`;
+        } else {
+            // Handle case where no token exists (redirect to login or get token from your auth system)
+            console.error('No JWT token found');
         }
         
-        function showAlert() {
-            alertOverlay.classList.add("active");
-            // Play alarm sound
-            try {
-                alarmSound.play().catch(error => {
-                    console.log("Audio playback failed:", error);
+        // Socket.io connection with auth
+        const socket = io({
+            extraHeaders: {
+                Authorization: `Bearer ${token}`
+            }
+        });
+        function verifyToken() {
+    const token = localStorage.getItem('jwtToken');
+    if (!token) {
+        console.log('No token found');
+        return;
+    }
+    
+    console.log('Token exists, payload:', JSON.parse(atob(token.split('.')[1])));
+    
+    // Send test request
+    fetch('/api/verify-token', {
+        headers: {
+            'Authorization': `Bearer ${token}`
+        }
+    })
+    .then(response => {
+        console.log('Token verification status:', response.status);
+        return response.json();
+    })
+    .then(data => console.log('Token verification response:', data))
+    .catch(error => console.error('Token verification error:', error));
+}
+        // Load chat history when page loads
+        window.onload = function() {
+            verifyToken(); // Verify token on load
+            if (currentUser) {
+                loadChatHistory();
+            }
+        };
+        
+        function loadChatHistory() {
+            fetch('/api/chats', {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            })
+            .then(response => response.json())
+            .then(chats => {
+                const chatList = document.getElementById('chat-list');
+                chatList.innerHTML = '';
+                
+                chats.forEach(chat => {
+                    const chatItem = document.createElement('div');
+                    chatItem.className = 'chat-item';
+                    chatItem.innerHTML = `
+                        <div class="chat-preview">${chat.query.substring(0, 30)}...</div>
+                        <div class="chat-time">${chat.timestamp}</div>
+                    `;
+                    chatItem.onclick = () => loadChat(chat.id);
+                    chatList.appendChild(chatItem);
                 });
-            } catch (error) {
-                console.log("Audio playback error:", error);
+            });
+        }
+        
+        function loadChat(chatId) {
+            fetch(`/api/chat/${chatId}`, {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            })
+            .then(response => response.json())
+            .then(chat => {
+                const chatContainer = document.getElementById('chat-container');
+                chatContainer.innerHTML = '';
+                displayMessage(chat.query, 'user');
+                displayMessage(chat.response, 'assistant');
+            });
+        }
+        
+        // Rest of your existing JavaScript functions with added auth headers...
+        function sendMessage() {
+    const message = document.getElementById('user-input').value.trim();
+    if (!message) return;
+
+    displayMessage(message, 'user');
+    document.getElementById('user-input').value = '';
+    
+    fetch('/api/chat', {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({ query: message })
+    })
+    .then(response => {
+        if (response.status === 401) {
+            throw new Error('Unauthorized');
+        }
+        return response.json();
+    })
+    .then(data => {
+        displayMessage(data.response, 'assistant');
+        loadChatHistory();
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        if (error.message === 'Unauthorized') {
+            alert('Your session has expired. Please login again.');
+            window.location.href = '/login';
+        } else {
+            displayMessage("Sorry, I encountered an error. Please try again.", 'assistant');
+        }
+    });
+}
+        
+        // Handle file upload with JWT
+        function handleFileSelection(input) {
+            if (input.files && input.files[0]) {
+                const formData = new FormData();
+                formData.append('file', input.files[0]);
+                
+                if (input.files[0].type.startsWith('image/')) {
+                    const query = document.getElementById('user-input').value.trim();
+                    if (query) formData.append('query', query);
+                }
+                
+                fetch('/api/chat', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: formData
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.response) {
+                        displayMessage(data.response, 'assistant');
+                        loadChatHistory(); // Refresh chat history
+                    }
+                });
+            }
+        }
+        
+        // Socket.io listeners with user check
+        socket.on('start_timer', (data) => {
+            if (data.username === currentUser) {
+                updateTimerDisplay(data.seconds);
+            }
+        });
+        
+        socket.on('timer_finished', (data) => {
+            if (data.username === currentUser) {
+                document.getElementById('alert-overlay').style.display = 'flex';
+                document.getElementById('alarm-sound').play();
+            }
+        });
+        
+        // Rest of your existing timer and UI functions...
+        function displayMessage(message, sender) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${sender}`;
+            messageDiv.innerHTML = `<p>${message}</p>`;
+            document.getElementById('chat-container').appendChild(messageDiv);
+            document.getElementById('chat-container').scrollTop = document.getElementById('chat-container').scrollHeight;
+        }
+        
+        function updateTimerDisplay(seconds) {
+            const mins = Math.floor(seconds / 60);
+            const secs = seconds % 60;
+            document.getElementById('timer').textContent = `⏳ Timer: ${mins}m ${secs}s`;
+        }
+        
+        function cancelTimer() {
+            socket.emit('cancel_timer');
+            document.getElementById('timer').textContent = '⏳ Timer: Not Set';
+        }
+        
+        function addTime(seconds) {
+            socket.emit('add_time', { seconds });
+        }
+        
+        function triggerFileInput() {
+            document.getElementById('file-input').click();
+        }
+        
+        function handleKeyPress(event) {
+            if (event.key === 'Enter') {
+                sendMessage();
             }
         }
         
         function dismissAlert() {
-            alertOverlay.classList.remove("active");
-            // Stop alarm sound
-            alarmSound.pause();
-            alarmSound.currentTime = 0;
+            document.getElementById('alert-overlay').style.display = 'none';
+            document.getElementById('alarm-sound').pause();
+            document.getElementById('alarm-sound').currentTime = 0;
+        }
+        
+        // Audio recording functions (same as before)
+        let mediaRecorder;
+        let audioChunks = [];
+        
+        async function toggleAudioRecording() {
+            if (!mediaRecorder) {
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    mediaRecorder = new MediaRecorder(stream);
+                    audioChunks = [];
+                    
+                    mediaRecorder.ondataavailable = event => {
+                        audioChunks.push(event.data);
+                    };
+                    
+                    mediaRecorder.onstop = async () => {
+                        const audioBlob = new Blob(audioChunks, { type: 'audio/m4a' });
+                        const formData = new FormData();
+                        formData.append('audio', audioBlob, 'recording.m4a');
+                        
+                        fetch('/api/chat', {
+                            method: 'POST',
+                            headers: {
+                                'Authorization': `Bearer ${token}`
+                            },
+                            body: formData
+                        })
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data.transcribed) {
+                                displayMessage(data.transcribed, 'user');
+                            }
+                            if (data.response) {
+                                displayMessage(data.response, 'assistant');
+                            }
+                            loadChatHistory(); // Refresh chat history
+                        });
+                    };
+                    
+                    mediaRecorder.start();
+                    document.getElementById('audio-btn').innerHTML = '<i class="fas fa-stop"></i>';
+                } catch (err) {
+                    console.error('Error accessing microphone:', err);
+                }
+            } else {
+                mediaRecorder.stop();
+                mediaRecorder.stream.getTracks().forEach(track => track.stop());
+                mediaRecorder = null;
+                document.getElementById('audio-btn').innerHTML = '<i class="fas fa-microphone"></i>';
+            }
         }
     </script>
-
 </body>
 </html>

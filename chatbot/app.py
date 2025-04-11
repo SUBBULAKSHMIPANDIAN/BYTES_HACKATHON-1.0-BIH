@@ -1,5 +1,5 @@
 import json
-from flask import Flask, request, jsonify, render_template
+from flask import Flask, request, jsonify, render_template, session
 from flask_cors import CORS
 from flask_socketio import SocketIO
 import groq
@@ -8,38 +8,62 @@ import threading
 from datetime import datetime, timedelta
 import os
 from twilio.rest import Client as TwilioClient
-
 from dotenv import load_dotenv
+import base64
+from PyPDF2 import PdfReader
+import docx
+import faiss
+import numpy as np
+from sentence_transformers import SentenceTransformer
 
 load_dotenv()
-
-# Get the API key from the .env file
-
 # Initialize Flask app with SocketIO
 app = Flask(__name__)
 CORS(app)
 socketio = SocketIO(app, cors_allowed_origins="*")
 
-
 groq_api_key = os.getenv("GROQ_API_KEY")
 client = groq.Client(api_key=groq_api_key) 
-    
+
+embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
+
+# Global index and mapping
+index = faiss.IndexFlatL2(384)  # For all-MiniLM-L6-v2
+id_to_text = {}
+next_id = 0 
+
 def detect_intent_llm(text):
     prompt = [
-        {"role": "system", "content": "You are an AI assistant that detects user intent from queries. Intent categories: greeting, study_schedule, set_reminder, motivation, general_query. Reply with only the intent name."},
-        {"role": "user", "content": f"Query: {text}"}
+        {
+            "role": "system",
+            "content": (
+                "You are an AI that extracts and classifies multiple intents from a user message.\n"
+                "Supported intents: greeting, study_schedule, set_reminder, motivation, general_query.\n"
+                "If the input contains multiple tasks, split them and label each with its intent.\n"
+                "Reply in JSON format like:\n"
+                "[{\"query\": \"message one\", \"intent\": \"greeting\"}, {\"query\": \"message two\", \"intent\": \"set_reminder\"}]"
+            )
+        },
+        {
+            "role": "user",
+            "content": f"User message: {text}"
+        }
     ]
 
     response = client.chat.completions.create(
         model="llama3-70b-8192",
         messages=prompt
     )
-    
-    intent = response.choices[0].message.content.strip().lower()
 
-    # Ensure a valid intent is returned
-    valid_intents = ["greeting", "study_schedule", "set_reminder", "motivation", "general_query"]
-    return intent if intent in valid_intents else "general_query"
+    try:
+        result = json.loads(response.choices[0].message.content)
+        # Ensure proper formatting
+        valid_intents = ["greeting", "study_schedule", "set_reminder", "motivation", "general_query"]
+        return [item for item in result if item["intent"] in valid_intents]
+    except Exception as e:
+        print("Intent parsing error:", e)
+        return [{"query": text, "intent": "general_query"}]
+
 
 def extract_time_llm(text):
     prompt = [
@@ -76,7 +100,7 @@ def extract_time_llm(text):
 twilio_sid = os.getenv("TWILIO_SID")
 twilio_token = os.getenv("TWILIO_TOKEN")
 twilio_number = os.getenv("TWILIO_NUMBER")
-user_phone_number = "+919360177805"  
+user_phone_number = os.getenv("USER_PHONE_NUMBER")
 
 twilio_client = TwilioClient(twilio_sid, twilio_token)
 
@@ -129,60 +153,221 @@ def generate_greeting_response(user_input):
     raw_response = response.choices[0].message.content
     return clean_response(raw_response)
 
+
+def transcribe_audio_to_text(audio_path):
+    with open(audio_path, "rb") as file:
+        transcription = client.audio.transcriptions.create(
+            file=(audio_path, file.read()),
+            model="whisper-large-v3-turbo",
+            response_format="verbose_json",
+            language="en"
+        )
+
+    return transcription.text
+
+
+def handle_image_query(image_file, query=None):
+    image_bytes = image_file.read()
+    mime_type = image_file.mimetype  # usually "image/jpeg" or "image/png"
+
+    # Encode image to base64
+    base64_image = base64.b64encode(image_bytes).decode("utf-8")
+
+    # Create image payload
+    image_payload = {
+        "type": "image_url",
+        "image_url": {
+            "url": f"data:{mime_type};base64,{base64_image}"
+        }
+    }
+
+    # Default to describing image
+    chat_prompt = query if query else "Describe this image in a very few lines.Dont provide extra context strictly follow this."
+
+    # Send to llama-3.2-11b-vision-preview via Groq client
+    response = client.chat.completions.create(
+        model="llama-3.2-11b-vision-preview",
+        messages=[
+            {
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": chat_prompt},
+                    image_payload
+                ]
+            }
+        ]
+    )
+
+    return response.choices[0].message.content
+
+def is_image(file):
+    return file.mimetype.startswith('image/')
+
+
+def extract_text(file):
+    ext = file.filename.lower()
+    if ext.endswith(".pdf"):
+        reader = PdfReader(file)
+        return "\n".join(page.extract_text() for page in reader.pages if page.extract_text())
+    elif ext.endswith(".docx"):
+        doc = docx.Document(file)
+        return "\n".join([para.text for para in doc.paragraphs])
+    elif ext.endswith(".txt"):
+        return file.read().decode("utf-8")
+    else:
+        raise ValueError("Unsupported file type")
+    
+def store_file_and_index(file):
+    global next_id
+
+    text = extract_text(file)
+    chunks = [text[i:i+500] for i in range(0, len(text), 500)]
+
+    for chunk in chunks:
+        embedding = embedding_model.encode(chunk, normalize_embeddings=True).astype("float32")
+        index.add(np.array([embedding]))
+        id_to_text[next_id] = chunk
+        next_id += 1
+
+def generate_llama_response_with_context(query, context):
+    final_prompt = f"""You are a AI Study Buddy assistant. Use the following context to answer the question.
+
+Context:
+{context}
+
+Question:
+{query}
+"""
+    chat_completion = client.chat.completions.create(
+        model="llama-3.3-70b-versatile",  # Or llama-3.3-70b-versatile
+        messages=[
+            {"role": "system", "content": "You are a knowledgeable assistant. Your job is to provide clear and accurate responses based strictly on the provided context.Dont provide information any other than the context strictly follow this rule "},
+            {"role": "user", "content": final_prompt}
+        ]
+    )
+    return chat_completion.choices[0].message.content.strip()
+
+
+def retrieve_relevant_text(query, top_k=5):
+    query_embedding = embedding_model.encode(query, normalize_embeddings=True).reshape(1, -1).astype("float32")
+    distances, indices = index.search(query_embedding, top_k)
+
+    retrieved = [id_to_text.get(i, "") for i in indices[0] if i >= 0]
+    return "\n".join(retrieved) if retrieved else "No relevant context found."
+
+
 @app.route("/chat", methods=["POST"])
 def chat():
-    user_input = request.json.get("query", "").strip()
+    global uploaded_doc_content
+    transcribed = None
 
-    if not user_input:
-        return jsonify({"response": "I couldn't find relevant information. Can you rephrase?"})
+    file = request.files.get("file")
+    query = request.form.get("query", "").strip() if request.form else None
 
-    intent = detect_intent_llm(user_input)
-    print("Intent:", intent)
+    # 🟡 Handle file uploads first (image or document)
+    if file:
+        if file.mimetype.startswith("image/"):
+            try:
+                response_text = handle_image_query(file, query)
+                return jsonify({"response": response_text})
+            except Exception as e:
+                print("Image handling error:", e)
+                return jsonify({"response": "❌ Failed to process the image."}), 500
 
-    if intent == "greeting":
-        return jsonify({"response": generate_greeting_response(user_input)})
+        elif any(file.filename.lower().endswith(ext) for ext in [".txt", ".pdf", ".docx"]):
+            try:
+                store_file_and_index(file)
+                if query:
+                    context = retrieve_relevant_text(query)
+                    response_text = generate_llama_response_with_context(query, context)
+                    return jsonify({"response": response_text})
+                else:
+                    return jsonify({"response": "📁 File processed. Ask your question related to the content."})
+            except Exception as e:
+                print("Document handling error:", e)
+                return jsonify({"response": "❌ Failed to process the document."}), 500
 
-    elif intent in ["study_schedule", "set_reminder"]:
-        time_data = extract_time_llm(user_input)
-        print("Time LLM Output:", time_data)
+        else:
+            return jsonify({"response": "❌ Unsupported file type."}), 415
 
-        if time_data:
-            scheduled_info = f"your scheduled session at {time_data['time']}"
-
-            if time_data["type"] == "relative":
-                # Start a screen timer
-                threading.Thread(target=start_timer, args=(time_data["seconds"],)).start()
-                return jsonify({
-                    "response": f"✅ Timer started! Your study session is set for {time_data['seconds']}. Time to focus! 📚"
-                })
-
-            elif time_data["type"] == "absolute":
-                # Schedule message and call
-                def alarm_trigger():
-                    send_sms(f"Hi! 📅 It’s time for {scheduled_info}. Stay sharp! 💪")
-                    make_call(f"This is your study assistant calling. It's time for {scheduled_info}. Let’s get started!")
-
-                now = datetime.now()
-                target_time = datetime.strptime(time_data["time"], "%I:%M %p")
-                target_time = target_time.replace(year=now.year, month=now.month, day=now.day)
-
-                if target_time < now:
-                    target_time += timedelta(days=1)  # Schedule for next day if time passed
-
-                delay_seconds = (target_time - now).total_seconds()
-                threading.Timer(delay_seconds, alarm_trigger).start()
-
-                return jsonify({
-                    "response": f"⏰ Alarm set for {time_data['time']}. I’ll call and message you when it’s time! 📞"
-                })
-
-        return jsonify({"response": "⌛ I can set up your study session, but I need a valid time. When should we start? 🕒"})
-
-    elif intent == "motivation":
-        return jsonify({"response": generate_response(user_input)})
+    # 🎤 Handle audio files
+    if 'audio' in request.files:
+        audio_file = request.files['audio']
+        temp_path = "temp_audio.m4a"
+        audio_file.save(temp_path)
+        user_input = transcribe_audio_to_text(temp_path)
+        transcribed = user_input
+        os.remove(temp_path)
 
     else:
-        return jsonify({"response": generate_response(user_input)})
+        # 💬 Handle regular text input
+        data = request.get_json()
+        user_input = data.get("query", "").strip() if data else ""
+        transcribed = user_input
+
+    if not user_input:
+        return jsonify({
+            "response": "I couldn't find relevant information. Can you rephrase?",
+            "transcribed": transcribed
+        })
+
+    # 🤖 Intent Detection and Execution
+    sub_queries = detect_intent_llm(user_input)
+    print("Detected sub-queries:", sub_queries)
+
+    responses = []
+
+    for item in sub_queries:
+        query = item["query"]
+        intent = item["intent"]
+        print(f"Processing intent '{intent}' for query: {query}")
+
+        if intent == "greeting":
+            responses.append(generate_greeting_response(query))
+
+        elif intent in ["study_schedule", "set_reminder"]:
+            time_data = extract_time_llm(query)
+            print("Time LLM Output:", time_data)
+
+            if time_data:
+                scheduled_info = f"your scheduled session at {time_data['time']}"
+
+                if time_data["type"] == "relative":
+                    threading.Thread(target=start_timer, args=(time_data["seconds"],)).start()
+                    responses.append(f"✅ Timer started! Your study session is set for {time_data['seconds']}. Time to focus! 📚")
+
+                elif time_data["type"] == "absolute":
+                    def alarm_trigger():
+                        send_sms(f"Hi! 📅 It’s time for {scheduled_info}. Stay sharp! 💪")
+                        make_call(f"This is your study assistant calling. It's time for {scheduled_info}. Let’s get started!")
+
+                    now = datetime.now()
+                    target_time = datetime.strptime(time_data["time"], "%I:%M %p")
+                    target_time = target_time.replace(year=now.year, month=now.month, day=now.day)
+
+                    if target_time < now:
+                        target_time += timedelta(days=1)
+
+                    delay_seconds = (target_time - now).total_seconds()
+                    threading.Timer(delay_seconds, alarm_trigger).start()
+
+                    responses.append(f"⏰ Alarm set for {time_data['time']}. I’ll call and message you when it’s time! 📞")
+            else:
+                responses.append("⌛ I can set up your study session, but I need a valid time. When should we start? 🕒")
+
+        elif intent == "motivation":
+            responses.append(generate_response(query))
+
+        else:  # general_query or fallback
+            responses.append(generate_response(query))
+
+    return jsonify({
+        "response": "\n\n".join(responses),
+        "transcribed": transcribed
+    })
+
+
+
     
 @app.route("/")
 def home():

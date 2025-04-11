@@ -20,7 +20,7 @@ client = groq.Client(api_key=groq_api_key)
 twilio_sid = os.getenv("TWILIO_SID")
 twilio_token = os.getenv("TWILIO_TOKEN")
 twilio_number = os.getenv("TWILIO_NUMBER")
-user_phone_number = "+919360177805"  # Static for now
+user_phone_number = os.getenv("USER_PHONE_NUMBER")
 
 twilio_client = TwilioClient(twilio_sid, twilio_token)
 
