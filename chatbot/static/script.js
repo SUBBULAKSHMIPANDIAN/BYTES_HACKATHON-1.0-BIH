@@ -1,4 +1,4 @@
-const socket = io.connect("http://localhost:6000");
+const socket = io.connect("http://localhost:8000");
 let timerInterval = null;
 let timeLeft = 0;
 let timerActive = false;
