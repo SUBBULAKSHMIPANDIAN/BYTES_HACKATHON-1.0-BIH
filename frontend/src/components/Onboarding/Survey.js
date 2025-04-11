@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../../api';
-import '../../styles/Onboarding.css';
 
 const Survey = () => {
   const navigate = useNavigate();
@@ -14,7 +13,7 @@ const Survey = () => {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleSubmit = async (e) => {
@@ -24,72 +23,161 @@ const Survey = () => {
         username: localStorage.getItem('username'),
         ...formData
       });
-      navigate('/dashboard');
+      navigate('/');
     } catch (error) {
       console.error('Error submitting survey:', error);
     }
   };
 
   const handleSkip = () => {
-    navigate('/dashboard');
+    navigate('/');
   };
 
   return (
-    <div className="onboarding-container">
-      <h2>User Survey</h2>
-      
-      <form className="survey-form" onSubmit={handleSubmit}>
-        <label>How many hours do you study per day?</label>
-        <input
-          type="number"
-          name="studyHours"
-          value={formData.studyHours}
-          onChange={handleChange}
-          placeholder="e.g., 3"
-          min="0"
-          max="24"
-        />
+    <div className="auth-page">
+      <style>{`
+        .auth-page {
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          min-height: 100vh;
+          background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+          padding: 2rem;
+        }
 
-        <label>What's your preferred study time?</label>
-        <select
-          name="preferredTime"
-          value={formData.preferredTime}
-          onChange={handleChange}
-        >
-          <option value="">Select time</option>
-          <option value="Morning">Morning</option>
-          <option value="Afternoon">Afternoon</option>
-          <option value="Evening">Evening</option>
-          <option value="Night">Night</option>
-        </select>
+        .auth-card {
+          background: rgba(0, 0, 0, 0.4);
+          box-shadow: 0 8px 32px rgba(0, 0, 0, 0.37);
+          backdrop-filter: blur(10px);
+          border-radius: 20px;
+          padding: 2.5rem;
+          text-align: center;
+          color: #ffffff;
+          width: 100%;
+          max-width: 400px;
+        }
 
-        <label>Subjects you find difficult:</label>
-        <input
-          type="text"
-          name="subjects"
-          value={formData.subjects}
-          onChange={handleChange}
-          placeholder="e.g., Maths, Physics"
-        />
+        .auth-heading {
+          margin-bottom: 1.5rem;
+          font-size: 1.8rem;
+          font-weight: bold;
+        }
 
-        <label>Current Stress Level:</label>
-        <select
-          name="stressLevel"
-          value={formData.stressLevel}
-          onChange={handleChange}
-        >
-          <option value="Low">Low</option>
-          <option value="Moderate">Moderate</option>
-          <option value="High">High</option>
-        </select>
+        .auth-input {
+          width: 100%;
+          padding: 0.8rem;
+          margin: 0.5rem 0;
+          border: none;
+          border-radius: 8px;
+          font-size: 1rem;
+          background: #1e2a38;
+          color: #fff;
+        }
 
-        <div className="form-buttons">
-          <button type="submit">Submit Survey</button>
-          <button type="button" onClick={handleSkip} className="skip-button">
+        .auth-input:focus {
+          outline: 2px solid #00b4db;
+        }
+
+        .auth-button {
+          width: 100%;
+          padding: 0.8rem;
+          margin-top: 1rem;
+          background-color: #00b4db;
+          color: #fff;
+          border: none;
+          border-radius: 8px;
+          font-size: 1rem;
+          font-weight: bold;
+          cursor: pointer;
+          transition: background-color 0.3s;
+        }
+
+        .auth-button:hover {
+          background-color: #009ac6;
+        }
+
+        .skip-button {
+          background-color: #e2e8f0;
+          color: #1a202c;
+          margin-top: 0.5rem;
+        }
+
+        @media (max-width: 480px) {
+          .auth-card {
+            padding: 1.5rem;
+            width: 90%;
+            border-radius: 16px;
+          }
+
+          .auth-heading {
+            font-size: 1.5rem;
+          }
+
+          .auth-input {
+            font-size: 0.95rem;
+            padding: 0.7rem;
+          }
+
+          .auth-button {
+            font-size: 0.95rem;
+            padding: 0.7rem;
+          }
+        }
+      `}</style>
+
+      <div className="auth-card">
+        <h2 className="auth-heading">Study Preferences</h2>
+        <form onSubmit={handleSubmit}>
+          <input
+            className="auth-input"
+            type="number"
+            name="studyHours"
+            placeholder="Hours studied per day"
+            value={formData.studyHours}
+            onChange={handleChange}
+            min="0"
+            max="24"
+          />
+
+          <select
+            className="auth-input"
+            name="preferredTime"
+            value={formData.preferredTime}
+            onChange={handleChange}
+          >
+            <option value="">Preferred Study Time</option>
+            <option value="Morning">Morning</option>
+            <option value="Afternoon">Afternoon</option>
+            <option value="Evening">Evening</option>
+            <option value="Night">Night</option>
+          </select>
+
+          <input
+            className="auth-input"
+            type="text"
+            name="subjects"
+            placeholder="Subjects you find difficult"
+            value={formData.subjects}
+            onChange={handleChange}
+          />
+
+          <select
+            className="auth-input"
+            name="stressLevel"
+            value={formData.stressLevel}
+            onChange={handleChange}
+          >
+            <option value="Low">Stress Level: Low</option>
+            <option value="Moderate">Stress Level: Moderate</option>
+            <option value="High">Stress Level: High</option>
+          </select>
+
+          <button type="submit" className="auth-button">Submit Survey</button>
+          <button type="button" className="auth-button skip-button" onClick={handleSkip}>
             Skip
           </button>
-        </div>
-      </form>
+        </form>
+      </div>
     </div>
   );
 };

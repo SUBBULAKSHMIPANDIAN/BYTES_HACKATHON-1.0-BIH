@@ -1,5 +1,3 @@
-
-
 .notes-section {
   background: white;
   padding: 1.5rem;
@@ -298,6 +296,31 @@
 .chatbot-button-wrapper {
   margin-bottom: 30px; /* Adjust spacing as needed */
 }
+/* Sample Page Button Styling */
+.sample-page-button {
+  background-color: #4cac8b; /* New green-teal shade */
+  color: white;
+  border: none;
+  padding: 12px 20px;
+  font-size: 1rem;
+  border-radius: 6px;
+  cursor: pointer;
+  margin-bottom: 10px;     /* Reduced bottom margin to move it higher */
+  margin-top: 10px;        /* Optional: adds space from top content */
+  transition: background-color 0.3s ease, transform 0.2s ease;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+.sample-page-button:hover {
+  background-color: #138d75; /* Slightly darker on hover */
+  transform: translateY(-2px);
+}
+
+.sample-page-button:active {
+  transform: translateY(0);
+}
+
+
 
 
 /*.graph-section {
