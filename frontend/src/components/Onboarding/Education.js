@@ -1,247 +1,167 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
-import api from '../../api'; // Ensure correct path
 
-const EducationForm = () => {
+function Education() {
   const navigate = useNavigate();
+  const [username, setUsername] = useState('');
+  const [educationLevel, setEducationLevel] = useState('');
+  const [classOrYear, setClassOrYear] = useState('');
+  const [institution, setInstitution] = useState('');
+  const [course, setCourse] = useState('');
+  const [semester, setSemester] = useState('');
 
-  const [formData, setFormData] = useState({
-    name: '',
-    email: '',
-    department: '',
-    year: '',
-  });
+  useEffect(() => {
+    const storedUsername = localStorage.getItem('username');
+    if (!storedUsername) {
+      alert('No user found. Please login.');
+      navigate('/login');
+    } else {
+      setUsername(storedUsername);
+    }
+  }, [navigate]);
 
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    try {
-      await api.post('/education', {
-        username: localStorage.getItem('username'),
-        ...formData
-      });
-      navigate('/survey');
-    } catch (error) {
-      console.error('Error submitting education:', error);
+  const getClassOptions = () => {
+    switch (educationLevel) {
+      case 'Secondary School':
+        return ['3rd Std', '4th Std', '5th Std'];
+      case 'High School':
+        return ['6th Std', '7th Std', '8th Std', '9th Std', '10th Std', '11th Std', '12th Std'];
+      case 'UG':
+        return ['1st Year (BE/BTech)', '2nd Year (BE/BTech)', '3rd Year (BE/BTech)', '4th Year (BE/BTech)', '1st Year (BSc)', '2nd Year (BSc)', '3rd Year (BSc)'];
+      case 'PG':
+        return ['1st Year (ME/MTech)', '2nd Year (ME/MTech)', '1st Year (MBA/MSc)', '2nd Year (MBA/MSc)'];
+      default:
+        return [];
     }
   };
 
-  const handleSkip = () => {
-    navigate('/survey');
+  const handleSubmit = async () => {
+    try {
+      const res = await fetch("http://localhost:5000/api/education", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          username,
+          educationLevel,
+          classOrYear,
+          institution,
+          course,
+          semester
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || "Error saving education");
+      alert("Education saved!");
+      navigate('/survey');
+    } catch (err) {
+      alert("Error saving education.");
+    }
+  };
+
+  const handleSkip = async () => {
+    try {
+      await axios.post('http://localhost:5000/api/education', {
+        username,
+        skipped: true
+      });
+      alert("Skipped education!");
+      navigate('/survey');
+    } catch (err) {
+      console.error(err);
+      alert("Error skipping education.");
+    }
   };
 
   return (
-    <div className="auth-page">
-      <style jsx>{`
-        .auth-page {
+    <>
+      <style>{`
+        body {
+          margin: 0;
+          padding: 0;
+          height: 100vh;
+          background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
           display: flex;
+          flex-direction: column;
           justify-content: center;
           align-items: center;
-          min-height: 100vh;
-          background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
-          padding: 2rem;
+          font-family: 'Segoe UI', sans-serif;
         }
-
-        .auth-card {
+        .greeting {
+          color: white;
+          font-size: 22px;
+          margin-bottom: 20px;
+          font-weight: bold;
+        }
+        .form-container {
           background: rgba(0, 0, 0, 0.4);
           box-shadow: 0 8px 32px rgba(0, 0, 0, 0.37);
           backdrop-filter: blur(10px);
           border-radius: 20px;
-          padding: 2.5rem;
+          padding: 40px;
           text-align: center;
           color: #ffffff;
+          width: 350px;
+        }
+        input, select {
           width: 100%;
-          max-width: 400px;
-        }
-
-        .auth-heading {
-          margin-bottom: 1rem;
-          font-size: 1.8rem;
-          font-weight: bold;
-        }
-
-        .auth-subheading {
-          font-size: 0.9rem;
-          margin-bottom: 1.5rem;
-          color: #ccc;
-        }
-
-        .form-group {
-          margin-bottom: 1.2rem;
-          text-align: left;
-        }
-
-        label {
-          display: block;
-          font-size: 0.9rem;
-          margin-bottom: 0.5rem;
-          color: #eee;
-        }
-
-        input {
-          width: 100%;
-          padding: 0.8rem;
-          border: none;
+          padding: 12px;
+          margin: 10px 0;
           border-radius: 8px;
-          font-size: 1rem;
+          border: none;
+          outline: none;
+          font-size: 16px;
           background: #1e2a38;
           color: #fff;
         }
-
-        input:focus {
-          outline: 2px solid #00b4db;
-        }
-
-        .submit-btn,
-        .skip-btn {
+        button {
           width: 100%;
-          padding: 0.8rem;
-          margin-top: 1rem;
+          padding: 12px;
+          margin-top: 10px;
+          background-color: #00b4db;
           border: none;
           border-radius: 8px;
-          font-size: 1rem;
-          font-weight: bold;
           cursor: pointer;
-          transition: background-color 0.3s;
-        }
-
-        .submit-btn {
-          background-color: #00b4db;
-          color: #fff;
-        }
-
-        .submit-btn:hover {
-          background-color: #009ac6;
-        }
-
-        .skip-btn {
-          background-color: #e5e7eb;
-          color: #333;
-        }
-
-        .skip-btn:hover {
-          background-color: #d1d5db;
-        }
-
-        .form-footer {
-          margin-top: 1.5rem;
-          font-size: 0.9rem;
-          color: #ccc;
-        }
-
-        .form-footer a {
-          color: #00b4db;
-          text-decoration: none;
+          color: white;
           font-weight: bold;
+          font-size: 16px;
+          transition: 0.3s;
         }
-
-        .form-footer a:hover {
-          text-decoration: underline;
-        }
-
-        @media (max-width: 480px) {
-          .auth-page {
-            padding: 1rem;
-            flex-direction: column;
-          }
-
-          .auth-card {
-            padding: 1.5rem;
-            width: 90%;
-            max-width: none;
-            border-radius: 16px;
-          }
-
-          .auth-heading {
-            font-size: 1.5rem;
-          }
-
-          .auth-subheading {
-            font-size: 0.85rem;
-          }
-
-          input {
-            font-size: 0.95rem;
-            padding: 0.7rem;
-          }
-
-          .submit-btn,
-          .skip-btn {
-            font-size: 0.95rem;
-            padding: 0.7rem;
-          }
-
-          .form-footer {
-            font-size: 0.85rem;
-          }
+        button:hover {
+          background-color: #009ac6;
         }
       `}</style>
 
-      <div className="auth-card">
-        <div className="auth-heading">Education Details</div>
-        <div className="auth-subheading">Fill in your academic information below</div>
+      <div className="greeting">Hi {username}, please fill your education details 👇</div>
 
-        <form onSubmit={handleSubmit}>
-          <div className="form-group">
-            <label htmlFor="name">Full Name</label>
-            <input
-              type="text"
-              name="name"
-              id="name"
-              placeholder="Enter your full name"
-              value={formData.name}
-              onChange={handleChange}
-              required
-            />
-          </div>
+      <div className="form-container">
+        <select value={educationLevel} onChange={(e) => setEducationLevel(e.target.value)}>
+          <option value="">🎓 Select Education Level</option>
+          <option value="Secondary School">Secondary School</option>
+          <option value="High School">High School</option>
+          <option value="UG">Undergraduate (UG)</option>
+          <option value="PG">Postgraduate (PG)</option>
+        </select>
 
-          <div className="form-group">
-            <label htmlFor="email">Email Address</label>
-            <input
-              type="email"
-              name="email"
-              id="email"
-              placeholder="Enter your email"
-              value={formData.email}
-              onChange={handleChange}
-              required
-            />
-          </div>
+        {educationLevel && (
+          <select value={classOrYear} onChange={(e) => setClassOrYear(e.target.value)}>
+            <option value="">📘 Select Class/Year</option>
+            {getClassOptions().map((option, index) => (
+              <option key={index} value={option}>{option}</option>
+            ))}
+          </select>
+        )}
 
-          <div className="form-group">
-            <label htmlFor="department">Department</label>
-            <input
-              type="text"
-              name="department"
-              id="department"
-              placeholder="e.g. Computer Science"
-              value={formData.department}
-              onChange={handleChange}
-            />
-          </div>
+        <input type="text" placeholder="🏫 Institution/College Name" value={institution} onChange={(e) => setInstitution(e.target.value)} />
+        <input type="text" placeholder="📚 Course Name" value={course} onChange={(e) => setCourse(e.target.value)} />
+        <input type="text" placeholder="📅 Semester" value={semester} onChange={(e) => setSemester(e.target.value)} />
 
-          <div className="form-group">
-            <label htmlFor="year">Year of Study</label>
-            <input
-              type="text"
-              name="year"
-              id="year"
-              placeholder="e.g. 3rd Year"
-              value={formData.year}
-              onChange={handleChange}
-            />
-          </div>
-
-          <button type="submit" className="submit-btn">Submit</button>
-          <button type="button" className="skip-btn" onClick={handleSkip}>Skip</button>
-        </form>
+        <button onClick={handleSubmit}>Submit</button>
+        <button onClick={handleSkip}>Skip</button>
       </div>
-    </div>
+    </>
   );
-};
+}
 
-export default EducationForm;
+export default Education;
