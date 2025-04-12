@@ -20,7 +20,7 @@ window.location.href = `http://127.0.0.1:8000?username=${encodedUsername}`;
   };
 
   const openSamplePage = () => {
-    navigate('/sample-page'); // You can change this route as needed
+    navigate('/mathsolver'); // You can change this route as needed
   };
 
   return (
@@ -37,7 +37,7 @@ window.location.href = `http://127.0.0.1:8000?username=${encodedUsername}`;
         <div className="panel middle-panel">
           {/* New Sample Page Button */}
           <button className="sample-page-button" onClick={openSamplePage}>
-            Go to Sample Page
+            Scan & Solve 
           </button>
           
           <h2>Your Study Dashboard</h2>

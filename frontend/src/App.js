@@ -8,6 +8,7 @@ import Survey from './components/Onboarding/Survey';
 import Chatbot from './components/Dashboard/chatbot';
 import api from './api';
 import '../src/styles/main.css';
+import MathSolver from './components/Dashboard/MathSolver';
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -66,7 +67,9 @@ function App() {
             <Chatbot />
           </ProtectedRoute>
         } />
-        
+        <Route path="/mathsolver" element={
+            <MathSolver />
+        } />
       </Routes>
     </Router>
   );
