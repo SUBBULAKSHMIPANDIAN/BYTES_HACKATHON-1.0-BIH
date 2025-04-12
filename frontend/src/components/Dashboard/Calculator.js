@@ -22,18 +22,36 @@ const ScientificCalculator = () => {
     }
   };
 
+  // Only handle special keys in keyDown, let onChange handle regular input
+  const handleKeyDown = (e) => {
+    // Handle Enter key as equals
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      try {
+        const evalResult = evaluate(expression);
+        setResult(evalResult.toString());
+      } catch {
+        setResult('Error');
+      }
+    }
+    // Handle Backspace
+    else if (e.key === 'Backspace') {
+      setExpression(prev => prev.slice(0, -1));
+    }
+  };
+
   return (
     <div style={styles.container}>
       <h2 style={styles.title}>Calculator</h2>
       <input
         value={expression}
-        readOnly
+        onChange={(e) => setExpression(e.target.value)}
+        onKeyDown={handleKeyDown}
         style={styles.input}
       />
       <div style={styles.result}>
-  Result: <span style={styles.resultValue}>{result}</span>
-</div>
-
+        Result: <span style={styles.resultValue}>{result}</span>
+      </div>
 
       <div style={styles.keypad}>
         {[
@@ -43,7 +61,11 @@ const ScientificCalculator = () => {
           '0', '.', '=', '+', 'sin(',
           'cos(', 'tan(', '(', ')', 'C'
         ].map((btn, i) => (
-          <button key={i} onClick={() => handleClick(btn)} style={styles.button}>
+          <button 
+            key={i} 
+            onClick={() => handleClick(btn)} 
+            style={styles.button}
+          >
             {btn}
           </button>
         ))}
@@ -54,19 +76,19 @@ const ScientificCalculator = () => {
 
 const styles = {
   container: {
-    background: 'white',
+    background: 'linear-gradient(to right, rgb(102, 126, 234), rgb(118, 75, 162))',
     padding: '2rem',
     borderRadius: '12px',
-    width: '400px',
-    margin: '2rem auto',
+    width: '350px',
     boxShadow: '0 10px 25px rgba(0,0,0,0.1)',
     textAlign: 'center',
+  
   },
   title: {
     marginBottom: '10px',
     fontSize: '1.5rem',
     fontWeight: 'bold',
-    color: '#2c3e50'
+    color: '#fff'
   },
   input: {
     width: '100%',
@@ -75,19 +97,19 @@ const styles = {
     marginBottom: '10px',
     borderRadius: '6px',
     border: '1px solid #ccc',
+    background: 'rgba(255,255,255,0.9)',
   },
   result: {
     marginBottom: '20px',
     fontWeight: 'bold',
     fontSize: '1.2rem',
-    color: '#34495e',
+    color: '#fff',
   },
   resultValue: {
     fontWeight: 'normal',
     fontSize: '1.6rem',
-    color: '#2c3e50',
+    color: '#fff',
   },
-  
   keypad: {
     display: 'grid',
     gridTemplateColumns: 'repeat(5, 1fr)',
@@ -97,12 +119,36 @@ const styles = {
   button: {
     padding: '10px',
     fontSize: '1rem',
-    background: '#eee',
+    background: 'rgba(255,255,255,0.8)',
     border: '1px solid #ccc',
     borderRadius: '4px',
     cursor: 'pointer',
-    transition: 'background 0.2s',
+    transition: 'all 0.2s',
+    fontWeight: 'bold',
+    color: '#2c3e50',
   },
+  '@media (max-width: 768px)': {
+    container: {
+      width: '150px',
+      padding: '1rem',
+    },
+    input: {
+      fontSize: '1rem',
+    },
+    button: {
+      fontSize: '0.9rem',
+      padding: '8px',
+    },
+    title: {
+      fontSize: '1.2rem',
+    },
+    result: {
+      fontSize: '1rem',
+    },
+    resultValue: {
+      fontSize: '1.4rem',
+    },
+    },
 };
 
 export default ScientificCalculator;

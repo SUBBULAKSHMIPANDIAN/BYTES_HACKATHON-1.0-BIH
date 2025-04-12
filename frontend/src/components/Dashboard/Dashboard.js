@@ -18,7 +18,9 @@ window.location.href = `http://127.0.0.1:8000?username=${encodedUsername}`;
 
 
   };
-
+const openRiddle = () => {
+    navigate('/riddle'); // You can change this route as needed
+  }
   const openSamplePage = () => {
     navigate('/mathsolver'); // You can change this route as needed
   };
@@ -45,9 +47,13 @@ window.location.href = `http://127.0.0.1:8000?username=${encodedUsername}`;
             Use this space to stay organized: Add notes, calculate, set reminders, and use timers to stay focused.
           </p>
 
-          {/* Chatbot button with spacing */}
+          
           <div className="chatbot-button-wrapper">
-            <button className="chatbot-button" onClick={openChatbot}>
+            <button
+              className="chatbot-button"
+              style={{ background: 'linear-gradient(to right, rgb(102, 126, 234), rgb(118, 75, 162))',width:'100%' }}
+              onClick={openChatbot}
+            >
               🗨️ Open Study Buddy Chatbot
             </button>
           </div>
@@ -56,8 +62,14 @@ window.location.href = `http://127.0.0.1:8000?username=${encodedUsername}`;
           <div className="graph-container">
             <GraphPlotter />
           </div>
+            
+            {/* Riddle section */}
+          <div className="riddle-container">
+            <button className="riddle-button" onClick={openRiddle}>
+              🧩 Solve a Riddle
+            </button>
+            </div>
         </div>
-
         {/* Right Panel */}
         <div className="panel right-panel">
           <Reminders />

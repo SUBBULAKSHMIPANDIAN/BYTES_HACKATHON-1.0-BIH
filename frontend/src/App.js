@@ -9,6 +9,7 @@ import Chatbot from './components/Dashboard/chatbot';
 import api from './api';
 import '../src/styles/main.css';
 import MathSolver from './components/Dashboard/MathSolver';
+import Riddle from './components/Dashboard/Riddle';
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -69,6 +70,9 @@ function App() {
         } />
         <Route path="/mathsolver" element={
             <MathSolver />
+        } />
+        <Route path="/riddle" element={
+            <Riddle />
         } />
       </Routes>
     </Router>

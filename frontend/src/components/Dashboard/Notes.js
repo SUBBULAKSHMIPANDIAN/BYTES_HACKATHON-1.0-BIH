@@ -144,7 +144,12 @@ const Notes = () => {
       <h3>Notes</h3>
       {error && !isModalOpen && <div className="error-message">{error}</div>}
       
-      <div className="items-list">
+      <div className="items-list" style={{
+    maxHeight: '300px',
+    overflowY: 'auto',
+    scrollbarWidth: 'none', /* Firefox */
+    msOverflowStyle: 'none', /* IE 10+ */
+  }}>
         {notes.length > 0 ? (
           notes.map((note) => (
             <div 
@@ -253,6 +258,11 @@ const Notes = () => {
           + Add Note
         </button>
       )}
+      <style jsx>{`
+  .items-list::-webkit-scrollbar {
+    display: none; /* Chrome, Safari, Opera */
+  }
+`}</style>
     </div>
   );
 };

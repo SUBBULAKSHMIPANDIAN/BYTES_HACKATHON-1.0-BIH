@@ -83,6 +83,7 @@ const Reminders = () => {
       maxWidth: isMobile ? '100%' : '600px',
       margin: 'auto',
       boxSizing: 'border-box',
+      background: 'linear-gradient(to right, rgb(102, 126, 234), rgb(118, 75, 162))',
     },
     heading: {
       textAlign: 'center',

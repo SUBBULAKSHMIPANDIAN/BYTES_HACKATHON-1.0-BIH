@@ -1,6 +1,9 @@
 .graph-container {
     text-align: center;
     margin-top: 20px;
+    padding: 20px;
+    background: linear-gradient(to right, rgb(102, 126, 234), rgb(118, 75, 162));
+    border-radius: 12px;
   }
   
   .graph-form {
