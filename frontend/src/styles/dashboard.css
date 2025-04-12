@@ -259,7 +259,6 @@
 
 /* Chatbot Button Styles */
 .chatbot-button {
-  margin-top: 20px;
   padding: 12px 20px;
   background-color: #4a6fa5;
   color: white;
@@ -278,41 +277,49 @@
 .chatbot-button:hover {
   background-color: #3a5a8f;
   transform: translateY(-2px);
-  box-shadow: 0 4px 8px rgba(0,0,0,0.15);
 }
 
 .chatbot-button:active {
   transform: translateY(0);
 }
 
+/* 🎯 Middle Panel Updated */
 .panel.middle-panel {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   text-align: center;
-  padding: 20px;
+  padding: 30px 10px 10px 10px;
+  min-height: 100vh;
 }
-.chatbot-button-wrapper {
-  margin-bottom: 30px; /* Adjust spacing as needed */
+
+/* Group buttons */
+.top-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  margin-bottom: 40px;
+  width: 100%;
+  align-items: center;
 }
+
 /* Sample Page Button Styling */
 .sample-page-button {
-  background-color: #4cac8b; /* New green-teal shade */
+  background-color: #4cac8b;
   color: white;
   border: none;
   padding: 12px 20px;
   font-size: 1rem;
   border-radius: 6px;
   cursor: pointer;
-  margin-bottom: 10px;     /* Reduced bottom margin to move it higher */
-  margin-top: 10px;        /* Optional: adds space from top content */
+  margin: 0;
   transition: background-color 0.3s ease, transform 0.2s ease;
   box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
 }
 
 .sample-page-button:hover {
-  background-color: #138d75; /* Slightly darker on hover */
+  background-color: #138d75;
   transform: translateY(-2px);
 }
 
@@ -320,26 +327,13 @@
   transform: translateY(0);
 }
 
-
-
-
-/*.graph-section {
-  margin-top: 20px;
-  padding: 1rem;
-  background-color: #f4f6fa;
-  border-radius: 10px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+/* Optional: Graph wrapper */
+.graph-section {
+  margin-top: 40px;
+  width: 100%;
+  display: flex;
+  justify-content: center;
 }
-.graph-container {
-  margin: 20px auto;
-  width: 90%;
-  max-width: 500px;
-  background: #f8f9fa;
-  padding: 20px;
-  border-radius: 12px;
-  box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-}*/
-
 
 /* 📱 Mobile Responsive Enhancements */
 @media (max-width: 480px) {
@@ -393,4 +387,30 @@
     font-size: 0.95rem;
     padding: 10px 16px;
   }
+}
+/* 🔧 Custom Spacing Adjustments */
+
+
+.sample-page-button {
+  margin-bottom: 30px; 
+}
+
+.note-preview {
+  margin-bottom: 20px; 
+}
+
+.chatbot-button {
+  margin-bottom: 30px;
+}
+
+.graph-section {
+  margin-top: 60px; 
+}
+
+.sample-page-button {
+  margin-bottom: 40px; 
+}
+
+.panel.middle-panel p {
+  margin-bottom: 40px;
 }
