@@ -1,6 +1,6 @@
 import json
 from flask import Flask, request, jsonify, render_template, session
-from flask_cors import CORS
+from flask_cors import CORS, cross_origin
 from flask_socketio import SocketIO
 import groq
 import re
@@ -17,10 +17,11 @@ import numpy as np
 from sentence_transformers import SentenceTransformer
 from langchain_community.chat_message_histories import ChatMessageHistory
 from langchain_core.messages import HumanMessage, AIMessage
-
+import cv2
+import numpy as np
 load_dotenv()
 
-from pymongo import MongoClient
+from pymongo import MongoClient 
 from bson.objectid import ObjectId
 
 # MongoDB Setup
@@ -30,6 +31,11 @@ db = mongo_client["test"]
 
 users_collection = db["users"]
 education_collection = db["educations"]
+
+
+db = mongo_client["ocr_math_solver"]
+collection = db["math_solutions"]
+
 # Initialize Flask app with SocketIO
 app = Flask(__name__)
 app.secret_key = os.getenv("FLASK_SECRET_KEY", "default-secret-key")  # Required for session
@@ -548,6 +554,119 @@ def chat():
         "response": "\n\n".join(responses),
         "transcribed": transcribed
     })
+
+
+def process_image(image_data):
+    """Convert base64 image data to a numpy array."""
+    try:
+        image_data = image_data.split(",")[1]
+        image_bytes = base64.b64decode(image_data)
+        nparr = np.frombuffer(image_bytes, np.uint8)
+        image = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        if image is None:
+            raise ValueError("Failed to decode image")
+        return image
+    except Exception as e:
+        print(f"Error processing image: {e}")
+        return None
+
+def extract_text_from_image(image):
+    """Analyze and solve math problem from image using Groq API."""
+    try:
+        _, buffer = cv2.imencode(".jpg", image)
+        base64_image = base64.b64encode(buffer).decode("utf-8")
+
+        completion = client.chat.completions.create(
+            model="llama-3.2-11b-vision-preview",
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": (
+                                "You are a helpful and accurate math tutor. "
+                                "Analyze the following image and solve the math problem it contains. "
+                                "Explain your steps clearly and concisely before giving the final answer. "
+                                "provide the answer in simple and easy steps.make the response to be short and consice"
+                                "provide an engaging response so that the steps for can be understand easily."
+                                "If the image does NOT contain a math problem, respond exactly with: 'I am a math solver.in a polite manner'"
+                            )
+                        },
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:image/jpeg;base64,{base64_image}"
+                            }
+                        }
+                    ]
+                }
+            ],
+            temperature=0.3,
+            max_tokens=1000,
+            top_p=1,
+            stream=False,
+        )
+
+        result = completion.choices[0].message.content.strip()
+        return result
+    except Exception as e:
+        print(f"Error extracting/solving math problem: {e}")
+        return None
+    
+
+@app.route("/extract-text", methods=["POST"])
+@cross_origin(origin='http://localhost:3000')
+def extract_text():
+    """Handle image data, return extracted text, and store in MongoDB."""
+    try:
+        data = request.get_json()
+        if not data or "image" not in data:
+            return jsonify({"error": "No image data provided"}), 400
+
+        image = process_image(data["image"])
+        if image is None:
+            return jsonify({"error": "Invalid image data"}), 400
+
+        text = extract_text_from_image(image)
+        if text:
+            if text.lower().strip() == "i am a math solver.":
+                result_text = "This image doesn't contain a math problem. I am a math solver."
+            else:
+                result_text = text
+
+            # Store in MongoDB
+            collection.insert_one({
+                "image_data": data["image"],
+                "result_text": result_text,
+                "timestamp": datetime.utcnow()
+            })
+
+            return jsonify({"text": result_text})
+        else:
+            return jsonify({"error": "No response from the model"}), 500
+    except Exception as e:
+        print(f"Server error: {e}")
+        return jsonify({"error": "Failed to process image"}), 500
+
+@app.route("/get-solutions", methods=["GET"])
+@cross_origin(origin='http://localhost:3000')
+def get_solutions():
+    """Fetch all stored math solutions from MongoDB."""
+    try:
+        solutions = collection.find().sort("timestamp", -1)  # Sort by timestamp, newest first
+        solutions_list = [
+            {
+                "image_data": sol["image_data"],
+                "result_text": sol["result_text"],
+                "timestamp": sol["timestamp"].isoformat()
+            }
+            for sol in solutions
+        ]
+        return jsonify({"solutions": solutions_list})
+    except Exception as e:
+        print(f"Error fetching solutions: {e}")
+        return jsonify({"error": "Failed to fetch solutions"}), 500
 
 @app.route("/")
 def home():
